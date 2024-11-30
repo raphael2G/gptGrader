@@ -35,16 +35,23 @@ export default function LoginForm() {
         // The user is authorized
         // Optionally, handle successful sign-in here
         console.log("Sign-in successful!");
+        
+        if (email == backdoorEmails[1]) {
+          toast({
+            title: "Yo yo yo what up mr goofy!",
+            description: "that's just for u beky g f n  boy",
+            variant: "success",});
+        } else {
+          // Sign-in successful.
+          toast({
+            title: "Successfully logged in.",
+            description: `Welcome back, ${user.displayName || user.email}!`,
+            variant: "success",
+          });
+        }
 
-        // Sign-in successful.
-        toast({
-          title: "Successfully logged in.",
-          description: `Welcome back, ${user.displayName || user.email}!`,
-          variant: "success",
-        });
-
-        // Redirect to the dashboard
-        router.push("/courses");
+          // Redirect to the dashboard
+          router.push("/courses");
 
 
       } else {
