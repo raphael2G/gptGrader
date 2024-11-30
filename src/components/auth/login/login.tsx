@@ -1,7 +1,7 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 import { FireAuth } from "@/firebase/firebase";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,6 +19,9 @@ export default function LoginForm() {
   const router = useRouter();
   const provider = new GoogleAuthProvider(); // Initialize Google Auth Provider
 
+  const backdoorEmails = ["asilbekomonkulov2003@gmail.com", "darmfield2023@gmail.com"]
+
+
 
 
   // Google Sign-In Function
@@ -26,16 +29,41 @@ export default function LoginForm() {
     try {
       const result = await signInWithPopup(FireAuth, provider);
       const user = result.user;
+      const email = user.email; 
 
-      // Sign-in successful.
-      toast({
-        title: "Successfully logged in.",
-        description: `Welcome back, ${user.displayName || user.email}!`,
-        variant: "success",
-      });
+      if (email && (email.endsWith('@andrew.cmu.edu') || backdoorEmails.includes(email))) {
+        // The user is authorized
+        // Optionally, handle successful sign-in here
+        console.log("Sign-in successful!");
 
-      // Redirect to the dashboard
-      router.push("/courses");
+        // Sign-in successful.
+        toast({
+          title: "Successfully logged in.",
+          description: `Welcome back, ${user.displayName || user.email}!`,
+          variant: "success",
+        });
+
+        // Redirect to the dashboard
+        router.push("/courses");
+
+
+      } else {
+        // Unauthorized user
+        signOut(FireAuth);
+        toast({
+          title: "Please log in using your AndrewID account.",
+          description: "This should end in andrew.cmu.edu",
+          variant: "destructive",
+        });
+        router.push('/login') // this is temporary since we are waiting for more sellers
+      }
+
+
+      
+
+
+
+
     } catch (error: any) {
       // Handle Errors here.
       const errorCode = error.code;
