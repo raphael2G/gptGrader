@@ -57,7 +57,7 @@ export default function AuthenticationPage() {
                             alt="Authentication"
                             objectFit="cover"
                             fill={true}
-                            className="object-cover object-[48%] w-full h-full"
+                            className="object-cover object-[40%] w-full h-full"
                         />
                     </div>
 

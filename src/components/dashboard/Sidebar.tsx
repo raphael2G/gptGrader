@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useTheme } from 'next-themes'
-import { Book, User, Settings, ChevronRight, ChevronLeft, Sun, Moon } from 'lucide-react'
+import { Book, User, Settings, ChevronRight, ChevronLeft, Sun, Moon, Briefcase } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { isUserInstructor } from '@/hooks/user-status'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -80,6 +81,13 @@ export function Sidebar() {
           <li>
             <SidebarItem icon={Book} label="My Courses" href="/courses" isCollapsed={isCollapsed} />
           </li>
+
+
+          {isUserInstructor() && (<li>
+            <SidebarItem icon={Briefcase} label="Manage Courses" href="/manage-courses" isCollapsed={isCollapsed} />
+          </li>)}
+
+
           <li>
             <SidebarItem icon={User} label="Account" href="/account" isCollapsed={isCollapsed} />
           </li>

@@ -20,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html className="bg-black" lang="en" >
+    <html className="" lang="en" >
       <body className={inter.className}>
         <AuthContextProvider> 
           {children}

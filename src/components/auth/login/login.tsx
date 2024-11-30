@@ -93,19 +93,19 @@ export default function LoginForm() {
   }
 
   return (
-    <div className="space-y-8">
-      {/* Google Sign-In Button */}
-      <Card className="w-full max-w-md m-3">
+    <div className="space-y-8 bg-black text-white max-h-screen flex items-center justify-center">
+      {/* Google Sign-In Card */}
+      <Card className="w-full max-w-md m-3 bg-black-800 text-white shadow-lg">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">Sign in</CardTitle>
-          <CardDescription className="text-center">
+          <CardDescription className="text-center text-gray-100">
             Use your AndrewID account to sign in
           </CardDescription>
         </CardHeader>
         <CardContent className="flex justify-center">
           <Button 
             onClick={() => signInWithGoogle()}
-            className="w-full max-w-sm"
+            className="w-full max-w-sm bg-white text-gray-700 hover:bg-gray-300 transition-colors"
             variant="outline"
           >
             <svg
@@ -127,13 +127,13 @@ export default function LoginForm() {
           </Button>
         </CardContent>
         <CardFooter className="flex justify-center">
-          <p className="text-sm text-muted-foreground text-center">
+          <p className="text-sm text-gray-400 text-center">
             By signing in, you agree to our{" "}
-            <a href="/terms" className="text-primary underline-offset-4 transition-colors hover:underline">
+            <a href="/terms" className="text-gray-200 underline-offset-4 transition-colors hover:underline">
               Terms of Service
             </a>{" "}
             and{" "}
-            <a href="/privacy" className="text-primary underline-offset-4 transition-colors hover:underline">
+            <a href="/privacy" className="text-gray-200 underline-offset-4 transition-colors hover:underline">
               Privacy Policy
             </a>
           </p>
@@ -141,4 +141,5 @@ export default function LoginForm() {
       </Card>
     </div>
   );
+  
 }

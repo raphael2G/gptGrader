@@ -1,5 +1,5 @@
 export interface RubricItem { description: string; points: number; }
-export interface Problem { id: string; question: string; maxPoints: number; rubric: RubricItem[]; }
+export interface Problem { id: string; question: string; maxPoints: number | undefined; rubric: RubricItem[]; }
 export interface Assignment { id: string; title: string; dueDate: string; finalSubmissionDeadline: string; status: 'not-started' | 'in-progress' | 'completed'; released: boolean; problems: Problem[]; }
 export interface Course { id: string; title: string; description: string; instructor: string; assignments: Assignment[]; }
 
