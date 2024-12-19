@@ -5,20 +5,18 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { CalendarIcon, Edit } from 'lucide-react'
-import { InstructorAssignment } from '@/lib/dummy/instructorCourses'
+import { IAssignment } from '@/models/Assignment'
 import { StatusBadge } from '@/components/dashboard/manageCourses/StatusBadge'
-import { Problem } from '@/lib/dummy/courses'
 import { useToast } from "@/hooks/use-toast"
+import { assignmentApi } from '@/api-client/endpoints/assignments'
 
 interface AssignmentDetailsProps {
-  assignment: InstructorAssignment
-  editedAssignment: InstructorAssignment
+  assignment: IAssignment
+  editedAssignment: IAssignment
   isEditDialogOpen: boolean
   setIsEditDialogOpen: (isOpen: boolean) => void
-  setEditedAssignment: (assignment: InstructorAssignment) => void
+  setEditedAssignment: (assignment: IAssignment) => void
   handleUpdateAssignment: () => void
-  handleStatusChange: () => void
-  problems: Problem[]
 }
 
 export function AssignmentDetails({
@@ -28,28 +26,41 @@ export function AssignmentDetails({
   setIsEditDialogOpen,
   setEditedAssignment,
   handleUpdateAssignment,
-  handleStatusChange,
-  problems
 }: AssignmentDetailsProps) {
   const { toast } = useToast()
   const [validationError, setValidationError] = useState<string | null>(null)
 
-  const validateAndUpdate = () => {
+  const validateAndUpdate = async () => {
     const dueDate = new Date(editedAssignment.dueDate)
-    const lateDeadline = new Date(editedAssignment.finalSubmissionDeadline)
+    const lateDeadline = new Date(editedAssignment.lateDueDate)
 
     if (lateDeadline < dueDate) {
-      setValidationError("Late submission deadline cannot be before the due date.")
+      setValidationError("Late due date cannot be before the due date.")
       toast({
         title: "Validation Error",
-        description: "Late submission deadline cannot be before the due date.",
+        description: "Late due date cannot be before the due date.",
         variant: "destructive",
       })
       return
     }
 
     setValidationError(null)
-    handleUpdateAssignment()
+
+    const { data, error } = await assignmentApi.update(assignment._id!.toString(), {
+      title: editedAssignment.title,
+      dueDate: editedAssignment.dueDate,
+      lateDueDate: editedAssignment.lateDueDate,
+    })
+
+    if (error) {
+      toast({
+        title: "Error updating assignment",
+        description: error.details || error.error,
+        variant: "destructive",
+      })
+    } else {
+      handleUpdateAssignment()
+    }
   }
 
   return (
@@ -88,18 +99,18 @@ export function AssignmentDetails({
                   <Label htmlFor="edit-due-date">Due Date</Label>
                   <Input
                     id="edit-due-date"
-                    type="date"
-                    value={editedAssignment?.dueDate}
-                    onChange={(e) => setEditedAssignment({ ...editedAssignment!, dueDate: e.target.value })}
+                    type="datetime-local"
+                    value={editedAssignment?.dueDate.toString().slice(0, 16)}
+                    onChange={(e) => setEditedAssignment({ ...editedAssignment!, dueDate: new Date(e.target.value) })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="edit-late-deadline">Late Submission Deadline</Label>
+                  <Label htmlFor="edit-late-deadline">Late Due Date</Label>
                   <Input
                     id="edit-late-deadline"
-                    type="date"
-                    value={editedAssignment?.finalSubmissionDeadline}
-                    onChange={(e) => setEditedAssignment({ ...editedAssignment!, finalSubmissionDeadline: e.target.value })}
+                    type="datetime-local"
+                    value={editedAssignment?.lateDueDate.toString().slice(0, 16)}
+                    onChange={(e) => setEditedAssignment({ ...editedAssignment!, lateDueDate: new Date(e.target.value) })}
                   />
                 </div>
                 {validationError && (
@@ -115,29 +126,26 @@ export function AssignmentDetails({
             <CalendarIcon className="h-4 w-4 text-muted-foreground" />
             <div>
               <p className="font-semibold">Due:</p>
-              <p className="text-sm text-muted-foreground">{assignment.dueDate}</p>
+              <p className="text-sm text-muted-foreground">{assignment.dueDate.toLocaleString()}</p>
             </div>
           </div>
           <div className="flex items-center space-x-2">
             <CalendarIcon className="h-4 w-4 text-muted-foreground" />
             <div>
-              <p className="font-semibold">Late Deadline:</p>
-              <p className="text-sm text-muted-foreground">{assignment.finalSubmissionDeadline}</p>
+              <p className="font-semibold">Late Due Date:</p>
+              <p className="text-sm text-muted-foreground">{assignment.lateDueDate.toLocaleString()}</p>
             </div>
           </div>
           <div>
             <p className="font-semibold">Status:</p>
-            <div onClick={handleStatusChange}>
-              <StatusBadge status={assignment.status} />
-            </div>
+            <StatusBadge status={assignment.status} />
           </div>
           <div>
             <p className="font-semibold">Problem Count:</p>
-            <p className="text-sm text-muted-foreground">{problems.length}</p>
+            <p className="text-sm text-muted-foreground">{assignment.problems.length}</p>
           </div>
         </div>
       </CardContent>
     </Card>
   )
 }
-

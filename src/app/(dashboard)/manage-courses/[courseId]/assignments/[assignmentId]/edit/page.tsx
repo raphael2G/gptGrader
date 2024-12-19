@@ -97,6 +97,8 @@ export default function EditAssignmentPage({ params }: { params: { courseId: str
     }
   }
 
+  type AssignmentStatus = "unreleased" | "released" | "closed" | "graded" 
+
   // Status change handler
   const handleStatusChange = async () => {
     if (!assignment) return
@@ -212,7 +214,7 @@ export default function EditAssignmentPage({ params }: { params: { courseId: str
       
       const { data, error } = await assignmentApi.deleteProblem(
         params.assignmentId,
-        problemId
+        problemId.toString()
       )
 
       if (error) {
@@ -253,7 +255,16 @@ export default function EditAssignmentPage({ params }: { params: { courseId: str
     )
   }
 
-  if (!assignment || !editedAssignment) {
+  if (!editedAssignment) {
+    return (
+      <div className="space-y-6">
+        <BackButton />
+        <div>Assignment not found</div>
+      </div>
+    )
+  }
+
+  if (!assignment || !assignment._id) {
     return (
       <div className="space-y-6">
         <BackButton />
@@ -263,6 +274,8 @@ export default function EditAssignmentPage({ params }: { params: { courseId: str
   }
 
   return (
+
+
     <div className="space-y-6">
       <BackButton />
       <h1 className="text-3xl font-bold">Assignment Details: {assignment.title}</h1>
@@ -274,16 +287,10 @@ export default function EditAssignmentPage({ params }: { params: { courseId: str
         setIsEditDialogOpen={setIsEditDialogOpen}
         setEditedAssignment={setEditedAssignment}
         handleUpdateAssignment={handleUpdateAssignment}
-        handleStatusChange={handleStatusChange}
-        problems={problems}
       />
 
       <ProblemList
-        problems={problems}
-        onEditProblem={handleEditProblem}
-        onUpdateProblem={handleUpdateProblem}
-        onAddProblem={handleAddProblem}
-        onDeleteProblem={handleDeleteProblem}
+        assignmentId={assignment._id.toString()}
       />
 
       <Dialog open={isEditProblemDialogOpen} onOpenChange={setIsEditProblemDialogOpen}>

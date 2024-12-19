@@ -24,12 +24,11 @@ import {
 interface ProblemCardProps {
   problem: IProblem
   index: number
-  onEdit: () => void
   onUpdateProblem: (problem: IProblem) => void
-  onDeleteProblem: (problemId: Types.ObjectId) => void
+  onDeleteProblem: () => void
 }
 
-const ProblemCard: React.FC<ProblemCardProps> = ({ problem, index, onEdit, onUpdateProblem, onDeleteProblem }) => {
+const ProblemCard: React.FC<ProblemCardProps> = ({ problem, index, onUpdateProblem, onDeleteProblem }) => {
   const [editingItemIndex, setEditingItemIndex] = useState(-1)
   const [isOpen, setIsOpen] = useState(true)
   const [rubricItems, setRubricItems] = useState<IRubricItem[]>(problem.rubric.items)
@@ -136,7 +135,7 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem, index, onEdit, onUpd
 
   const confirmDeleteProblem = () => {
     if (problem._id) {
-      onDeleteProblem(problem._id)
+      onDeleteProblem()
     }
     setIsDeleteDialogOpen(false)
   }
