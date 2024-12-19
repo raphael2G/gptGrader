@@ -95,7 +95,6 @@ export const submitAnswerQuery = async (
       submission.answer = answer;
       submission.submittedAt = now;
       submission.graded = false;  // Reset graded status
-      submission.earnedPoints = undefined;  // Clear earned points
       submission.gradedBy = undefined;  // Clear grader reference
       submission.gradedAt = undefined;  // Clear grading timestamp
       submission.appliedRubricItems = [];  // Clear applied rubric items

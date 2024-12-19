@@ -9,7 +9,6 @@ export type ISubmission = {
   answer: string;
   submittedAt: Date;
   graded: boolean;
-  earnedPoints?: number;
   gradedBy?: mongoose.Types.ObjectId; // Reference to User
   gradedAt?: Date;
   appliedRubricItems?: IRubricItem[]; // Reference to the RubricItems
@@ -24,7 +23,6 @@ const submissionSchema = new Schema<ISubmission>({
   answer: { type: String, required: true },
   submittedAt: { type: Date, required: true },
   graded: { type: Boolean, required: true },
-  earnedPoints: { type: Number },
   gradedBy: { type: Schema.Types.ObjectId, ref: 'User' },
   gradedAt: { type: Date },
   appliedRubricItems: [{ type: Schema.Types.ObjectId, ref: 'Assignment.problems.rubric.items' }]
