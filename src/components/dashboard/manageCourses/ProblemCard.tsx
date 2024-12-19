@@ -2,14 +2,14 @@ import React, { useState, useEffect } from 'react'
 import { Table, TableBody, TableHeader, TableHead, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { ChevronDown, ChevronUp, Edit, Save, X, Trash2 } from 'lucide-react'
-import { RubricItem } from '@/lib/dummy/courses'
-import { Problem } from '@/lib/dummy/courses'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Card, CardHeader, CardContent } from "@/components/ui/card"
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { DraggableRubricItem } from '@/components/dashboard/manageCourses/DraggableRubricItem'
 import { Textarea } from "@/components/ui/textarea"
+import { Types } from 'mongoose'
+import { IProblem, IRubricItem } from '@/models/Assignment'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,18 +22,18 @@ import {
 } from "@/components/ui/alert-dialog"
 
 interface ProblemCardProps {
-  problem: Problem
+  problem: IProblem
   index: number
   onEdit: () => void
-  onUpdateProblem: (problem: Problem) => void
-  onDeleteProblem: (problemId: string) => void
+  onUpdateProblem: (problem: IProblem) => void
+  onDeleteProblem: (problemId: Types.ObjectId) => void
 }
 
 const ProblemCard: React.FC<ProblemCardProps> = ({ problem, index, onEdit, onUpdateProblem, onDeleteProblem }) => {
   const [editingItemIndex, setEditingItemIndex] = useState(-1)
   const [isOpen, setIsOpen] = useState(true)
-  const [rubricItems, setRubricItems] = useState(problem.rubric)
-  const [totalPoints, setTotalPoints] = useState(0)
+  const [rubricItems, setRubricItems] = useState<IRubricItem[]>(problem.rubric.items)
+  const [totalPoints, setTotalPoints] = useState(problem.maxPoints)
   const [isEditingQuestion, setIsEditingQuestion] = useState(false)
   const [editedQuestion, setEditedQuestion] = useState(problem.question)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
@@ -41,7 +41,14 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem, index, onEdit, onUpd
   useEffect(() => {
     const newTotal = rubricItems.reduce((sum, item) => sum + Math.max(item.points, 0), 0)
     setTotalPoints(newTotal)
-  }, [rubricItems])
+    // Update problem maxPoints when rubric items change
+    if (newTotal !== problem.maxPoints) {
+      onUpdateProblem({
+        ...problem,
+        maxPoints: newTotal
+      })
+    }
+  }, [rubricItems, problem, onUpdateProblem])
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -55,21 +62,27 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem, index, onEdit, onUpd
 
     if (active.id !== over?.id) {
       setRubricItems((items) => {
-        const oldIndex = items.findIndex((item) => item.description === active.id)
-        const newIndex = items.findIndex((item) => item.description === over?.id)
+        const oldIndex = items.findIndex((item) => item._id?.toString() === active.id)
+        const newIndex = items.findIndex((item) => item._id?.toString() === over?.id)
 
         const newItems = arrayMove(items, oldIndex, newIndex)
-        onUpdateProblem({ ...problem, rubric: newItems })
+        onUpdateProblem({
+          ...problem,
+          rubric: { items: newItems }
+        })
         return newItems
       })
     }
   }
 
-  const handleSaveRubricItem = (updatedItem: RubricItem, itemIndex: number) => {
+  const handleSaveRubricItem = (updatedItem: IRubricItem, itemIndex: number) => {
     const updatedRubric = [...rubricItems]
     updatedRubric[itemIndex] = updatedItem
     setRubricItems(updatedRubric)
-    onUpdateProblem({ ...problem, rubric: updatedRubric })
+    onUpdateProblem({
+      ...problem,
+      rubric: { items: updatedRubric }
+    })
     setEditingItemIndex(-1)
   }
 
@@ -80,26 +93,35 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem, index, onEdit, onUpd
   const handleDeleteRubricItem = (itemIndex: number) => {
     const updatedRubric = rubricItems.filter((_, index) => index !== itemIndex)
     setRubricItems(updatedRubric)
-    onUpdateProblem({ ...problem, rubric: updatedRubric })
+    onUpdateProblem({
+      ...problem,
+      rubric: { items: updatedRubric }
+    })
   }
 
   const handleAddRubricItem = () => {
-    const newItem: RubricItem = {
+    const newItem: IRubricItem = {
       description: 'New rubric item',
       points: 0
     }
     const updatedRubric = [...rubricItems, newItem]
     setRubricItems(updatedRubric)
-    onUpdateProblem({ ...problem, rubric: updatedRubric })
+    onUpdateProblem({
+      ...problem,
+      rubric: { items: updatedRubric }
+    })
   }
 
   const handleEditQuestion = () => {
-    setIsEditingQuestion(true);
-    setEditedQuestion(problem.question);
-  };
+    setIsEditingQuestion(true)
+    setEditedQuestion(problem.question)
+  }
 
   const handleSaveQuestion = () => {
-    onUpdateProblem({ ...problem, question: editedQuestion })
+    onUpdateProblem({
+      ...problem,
+      question: editedQuestion
+    })
     setIsEditingQuestion(false)
   }
 
@@ -113,7 +135,9 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem, index, onEdit, onUpd
   }
 
   const confirmDeleteProblem = () => {
-    onDeleteProblem(problem.id)
+    if (problem._id) {
+      onDeleteProblem(problem._id)
+    }
     setIsDeleteDialogOpen(false)
   }
 
@@ -205,13 +229,13 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem, index, onEdit, onUpd
                 </TableHeader>
                 <TableBody>
                   <SortableContext
-                    items={rubricItems.map(item => item.description)}
+                    items={rubricItems.map(item => item._id?.toString() || item.description)}
                     strategy={verticalListSortingStrategy}
                   >
                     {rubricItems.map((item, itemIndex) => (
                       <DraggableRubricItem
-                        key={item.description}
-                        id={item.description}
+                        key={item._id?.toString() || itemIndex}
+                        id={item._id?.toString() || item.description}
                         item={item}
                         isEditing={editingItemIndex === itemIndex}
                         onEdit={() => setEditingItemIndex(itemIndex)}
@@ -252,4 +276,3 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem, index, onEdit, onUpd
 }
 
 export default ProblemCard
-
