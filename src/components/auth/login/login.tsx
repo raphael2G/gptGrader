@@ -5,7 +5,7 @@ import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 import { FireAuth } from "@/firebase/firebase";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-
+import { userApi } from "@/api-client/endpoints/users";
 
 /**
  * This component is used to render the login form with Google Single Sign-On.
@@ -19,40 +19,39 @@ export default function LoginForm() {
   const router = useRouter();
   const provider = new GoogleAuthProvider(); // Initialize Google Auth Provider
 
-  const backdoorEmails = ["asilbekomonkulov2003@gmail.com", "darmfield2023@gmail.com"]
-
 
 
 
   // Google Sign-In Function
   async function signInWithGoogle() {
     try {
+
       const result = await signInWithPopup(FireAuth, provider);
       const user = result.user;
       const email = user.email; 
 
-      if (email && (email.endsWith('@andrew.cmu.edu') || backdoorEmails.includes(email))) {
-        // The user is authorized
-        // Optionally, handle successful sign-in here
-        console.log("Sign-in successful!");
+      if (email) {
+        // Create user in our database
+
+        const { data, error } = await userApi.create(
+          user.uid,
+          user.email,
+          user.displayName || undefined
+        );
         
-        if (email == backdoorEmails[1]) {
-          toast({
-            title: "Yo yo yo what up mr goofy!",
-            description: "that's just for u beky g f n  boy",
-            variant: "success",});
-        } else {
-          // Sign-in successful.
-          toast({
-            title: "Successfully logged in.",
-            description: `Welcome back, ${user.displayName || user.email}!`,
-            variant: "success",
-          });
+        if (error) {
+          throw new Error(error.error);
         }
 
-          // Redirect to the dashboard
-          router.push("/courses");
+        // Success toast and redirect
+        toast({
+          title: "Successfully logged in",
+          description: `Welcome back, ${user.displayName || user.email}!`,
+          variant: "success",
+        });
 
+        // Redirect to the dashboard
+        router.push("/courses");
 
       } else {
         // Unauthorized user
@@ -64,10 +63,6 @@ export default function LoginForm() {
         });
         router.push('/login') // this is temporary since we are waiting for more sellers
       }
-
-
-      
-
 
 
 
