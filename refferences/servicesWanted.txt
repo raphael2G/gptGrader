@@ -1,0 +1,30 @@
+Services:
+Below are a bunch of services that I am going to make first. I’ll handle grading later
+
+
+Course Services:
+createCourse
+addStudent
+addInstructor
+getStudentCourses (this should maybe be under users service)
+getInstructorCourses (this should maybe be under users service)
+updateCourseDetails
+addAssignment
+
+Assignment Services:
+createAssignment
+updateAssignment
+deleteAssignment
+addProblem
+editProblem
+addRubricItem
+editRubricItem
+
+Submission Services
+submitAnswer
+
+
+User Services:
+createUser
+getStudentCourses (this should maybe be under course service)
+getInstructorCourses (this should maybe be under course service)
