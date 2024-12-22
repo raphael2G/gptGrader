@@ -1,3 +1,5 @@
+// legacy /manage-courses/[courseId]/[assignmentId]/edit. 
+
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -13,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { BackButton } from '@/components/dashboard/BackButton'
+import { BackButton } from '@/components/various/BackButton'
 import { getInstructorCourses, updateInstructorCourse, InstructorCourse, InstructorAssignment, AssignmentStatus } from '@/lib/dummy/instructorCourses'
 import {Problem} from '@/lib/dummy/courses'   
 import { AssignmentDetails } from '@/components/dashboard/manageCourses/AssignmentDetails'

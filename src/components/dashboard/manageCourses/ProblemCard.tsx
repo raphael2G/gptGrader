@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Table, TableBody, TableHeader, TableHead, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { ChevronDown, ChevronUp, Edit, Save, X, Trash2 } from 'lucide-react'
-import { RubricItem } from '@/lib/dummy/courses'
-import { Problem } from '@/lib/dummy/courses'
+import { IProblem, IRubricItem } from '@@/models/Assignment'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Card, CardHeader, CardContent } from "@/components/ui/card"
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core'
@@ -20,16 +19,23 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { RubricSection } from "@/components/various/RubricSection"
 
 interface ProblemCardProps {
-  problem: Problem
+  problem: IProblem
   index: number
   onEdit: () => void
-  onUpdateProblem: (problem: Problem) => void
+  onUpdateProblem: (problem: IProblem) => void
   onDeleteProblem: (problemId: string) => void
 }
 
-const ProblemCard: React.FC<ProblemCardProps> = ({ problem, index, onEdit, onUpdateProblem, onDeleteProblem }) => {
+const ProblemCard: React.FC<ProblemCardProps> = ({ 
+  problem, 
+  index, 
+  onEdit, 
+  onUpdateProblem, 
+  onDeleteProblem 
+}) => {
   const [editingItemIndex, setEditingItemIndex] = useState(-1)
   const [isOpen, setIsOpen] = useState(true)
   const [rubricItems, setRubricItems] = useState(problem.rubric)
@@ -39,8 +45,12 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem, index, onEdit, onUpd
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
 
   useEffect(() => {
-    const newTotal = rubricItems.reduce((sum, item) => sum + Math.max(item.points, 0), 0)
+    const newTotal = rubricItems?.length > 0 ? rubricItems.reduce((sum, item) => sum + Math.max(item.points, 0), 0) : 0
     setTotalPoints(newTotal)
+    // Update problem's maxPoints when rubric items change
+    if (newTotal !== problem.maxPoints) {
+      onUpdateProblem({ ...problem, maxPoints: newTotal })
+    }
   }, [rubricItems])
 
   const sensors = useSensors(
@@ -55,21 +65,21 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem, index, onEdit, onUpd
 
     if (active.id !== over?.id) {
       setRubricItems((items) => {
-        const oldIndex = items.findIndex((item) => item.description === active.id)
-        const newIndex = items.findIndex((item) => item.description === over?.id)
+        const oldIndex = items.findIndex((item) => item._id?.toString() === active.id)
+        const newIndex = items.findIndex((item) => item._id?.toString() === over?.id)
 
         const newItems = arrayMove(items, oldIndex, newIndex)
-        onUpdateProblem({ ...problem, rubric: newItems })
+        onUpdateProblem({ ...problem, rubric: { items: newItems } })
         return newItems
       })
     }
   }
 
-  const handleSaveRubricItem = (updatedItem: RubricItem, itemIndex: number) => {
+  const handleSaveRubricItem = (updatedItem: IRubricItem, itemIndex: number) => {
     const updatedRubric = [...rubricItems]
     updatedRubric[itemIndex] = updatedItem
     setRubricItems(updatedRubric)
-    onUpdateProblem({ ...problem, rubric: updatedRubric })
+    onUpdateProblem({ ...problem, rubric: { items: updatedRubric } })
     setEditingItemIndex(-1)
   }
 
@@ -80,23 +90,23 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem, index, onEdit, onUpd
   const handleDeleteRubricItem = (itemIndex: number) => {
     const updatedRubric = rubricItems.filter((_, index) => index !== itemIndex)
     setRubricItems(updatedRubric)
-    onUpdateProblem({ ...problem, rubric: updatedRubric })
+    onUpdateProblem({ ...problem, rubric: { items: updatedRubric } })
   }
 
   const handleAddRubricItem = () => {
-    const newItem: RubricItem = {
+    const newItem: IRubricItem = {
       description: 'New rubric item',
       points: 0
     }
     const updatedRubric = [...rubricItems, newItem]
     setRubricItems(updatedRubric)
-    onUpdateProblem({ ...problem, rubric: updatedRubric })
+    onUpdateProblem({ ...problem, rubric: { items: updatedRubric } })
   }
 
   const handleEditQuestion = () => {
-    setIsEditingQuestion(true);
-    setEditedQuestion(problem.question);
-  };
+    setIsEditingQuestion(true)
+    setEditedQuestion(problem.question)
+  }
 
   const handleSaveQuestion = () => {
     onUpdateProblem({ ...problem, question: editedQuestion })
@@ -115,6 +125,15 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem, index, onEdit, onUpd
   const confirmDeleteProblem = () => {
     onDeleteProblem(problem.id)
     setIsDeleteDialogOpen(false)
+  }
+
+  const handleUpdateRubric = (items: IRubricItem[]) => {
+    const totalPoints = items.reduce((sum, item) => sum + Math.max(item.points, 0), 0)
+    onUpdateProblem({ 
+      ...problem, 
+      maxPoints: totalPoints,
+      rubric: { items } 
+    })
   }
 
   return (
@@ -173,65 +192,10 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem, index, onEdit, onUpd
         </div>
       </CardHeader>
       <CardContent>
-        <Collapsible open={isOpen} onOpenChange={setIsOpen} className="mt-4">
-          <CollapsibleTrigger asChild>
-            <Button 
-              variant="ghost" 
-              onClick={() => setIsOpen(!isOpen)} 
-              className="p-0 hover:bg-transparent w-full justify-start"
-            >
-              <div className="flex items-center group">
-                <h4 className="text-md font-semibold mr-2">Rubric</h4>
-                <div className="transition-colors duration-200 ease-in-out group-hover:bg-gray-200 dark:group-hover:bg-gray-700 rounded-full p-1">
-                  {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                </div>
-              </div>
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[50px]"></TableHead>
-                    <TableHead className="w-[70%]">Description</TableHead>
-                    <TableHead className="w-[15%] text-right">Points</TableHead>
-                    <TableHead className="w-[15%]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <SortableContext
-                    items={rubricItems.map(item => item.description)}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    {rubricItems.map((item, itemIndex) => (
-                      <DraggableRubricItem
-                        key={item.description}
-                        id={item.description}
-                        item={item}
-                        isEditing={editingItemIndex === itemIndex}
-                        onEdit={() => setEditingItemIndex(itemIndex)}
-                        onSave={(updatedItem) => handleSaveRubricItem(updatedItem, itemIndex)}
-                        onCancel={handleCancelEdit}
-                        onDelete={() => handleDeleteRubricItem(itemIndex)}
-                      />
-                    ))}
-                  </SortableContext>
-                </TableBody>
-              </Table>
-              <div className="mt-4 flex justify-between items-center">
-                <p className="text-lg font-semibold">Total Points: {totalPoints}</p>
-                <Button onClick={handleAddRubricItem} variant="outline">
-                  Add Rubric Item
-                </Button>
-              </div>
-            </DndContext>
-          </CollapsibleContent>
-        </Collapsible>
+        <RubricSection 
+          rubricItems={problem.rubric}
+          onUpdateRubric={handleUpdateRubric}
+        />
       </CardContent>
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
@@ -252,4 +216,3 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ problem, index, onEdit, onUpd
 }
 
 export default ProblemCard
-

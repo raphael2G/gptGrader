@@ -1,20 +1,49 @@
-"use client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import {standardAuthenticationProtection} from "@/hooks/page-protection"
-import { useEffect } from "react"
-import {redirect} from "next/navigation"
-import { UserAuth } from "@/contexts/AuthContext";
+'use client'
 
+import { useState, useEffect } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { userApi } from '@/app/lib/client-api/users'
+import { IUser } from '@@/models/User'
+import { useToast } from "@/components/ui/use-toast"
 
 export default function AccountPage() {
-
-  const {user} = UserAuth();
+  const [user, setUser] = useState<IUser | null>(null)
+  const [loading, setLoading] = useState(true)
+  const { toast } = useToast()
 
   useEffect(() => {
-    if (!user) {
-      redirect('/login')
+    const fetchUserData = async () => {
+      try {
+        // For this example, we'll use a hardcoded user ID.
+        // In a real application, you'd get this from an auth context or similar.
+        const userId = '1'
+        const response = await userApi.getUserById(userId)
+        if (response.data) {
+          setUser(response.data)
+        } else {
+          throw new Error(response.error?.error || 'Failed to fetch user data')
+        }
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to load user data. Please try again later.",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [user])
+
+    fetchUserData()
+  }, [toast])
+
+  if (loading) {
+    return <div>Loading user data...</div>
+  }
+
+  if (!user) {
+    return <div>Failed to load user data. Please try again later.</div>
+  }
 
   return (
     <div className="space-y-6">
@@ -24,9 +53,9 @@ export default function AccountPage() {
           <CardTitle>Account Information</CardTitle>
         </CardHeader>
         <CardContent>
-          <p>Name: John Doe</p>
-          <p>Email: john.doe@example.com</p>
-          <p>Student ID: 12345678</p>
+          <p>Name: {user.name}</p>
+          <p>Email: {user.email}</p>
+          <p>Student ID: {user._id}</p>
         </CardContent>
       </Card>
       <Card>

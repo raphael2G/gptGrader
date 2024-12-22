@@ -1,11 +1,13 @@
-'use client';
-import { useState } from 'react'
+'use client'
+
+import { useState, useEffect } from 'react'
 import { CourseCard } from '@/components/dashboard/CourseCard'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { PlusCircle, X } from 'lucide-react'
-import { courses } from '@/lib/dummy/courses'
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/components/ui/use-toast"
+import { courseApi } from '@@/lib/client-api/courses'
+import { ICourse } from '@@/models/Course'
 import {
   Dialog,
   DialogContent,
@@ -18,21 +20,73 @@ import {
 export default function Home() {
   const [courseCode, setCourseCode] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [enrolledCourses, setEnrolledCourses] = useState<ICourse[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
 
-  // For this example, we'll assume the first three courses are the user's enrolled courses
-  const enrolledCourses = courses.slice(0, 3)
+  useEffect(() => {
+    const fetchEnrolledCourses = async () => {
+      setLoading(true)
+      try {
+        const userId = '1' // This should be replaced with the actual logged-in user's ID
+        const response = await courseApi.getEnrolledCourses(userId)
+        if (response.data) {
+          setEnrolledCourses(response.data)
+        } else {
+          throw new Error(response.error?.error || 'Failed to fetch enrolled courses')
+        }
+      } catch (err) {
+        setError('Failed to fetch enrolled courses')
+        toast({
+          title: "Error",
+          description: "Failed to fetch enrolled courses. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
 
-  const handleJoinCourse = (e: React.FormEvent) => {
-    e.preventDefault()
-    // Here you would typically make an API call to join the course
-    // For now, we'll just show a success message and close the dialog
-    toast({
-      title: "Course Joined",
-      description: `You have successfully joined the course with code ${courseCode}.`,
-    })
-    setIsDialogOpen(false)
-    setCourseCode('')
+    fetchEnrolledCourses()
+  }, [toast]) // Remove enrolledCourses from the dependency array
+
+  const handleJoinCourse = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      // Assuming we have a method to get the current user's ID
+      // For now, we'll use a placeholder user ID
+      const userId = '1'; // This should be replaced with the actual logged-in user's ID
+      const response = await courseApi.addStudent(courseCode, userId);
+      if (response.data) {
+        toast({
+          title: "Course Joined",
+          description: `You have successfully joined the course ${response.data.title}.`,
+        });
+        setEnrolledCourses(prevCourses => [...prevCourses, response.data]);
+      } else {
+        throw new Error(response.error?.error || 'Failed to join course');
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to join the course. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+      setIsDialogOpen(false);
+      setCourseCode('');
+    }
+  };
+
+  if (loading) {
+    return <div>Loading courses...</div>
+  }
+
+  if (error) {
+    return <div>Error: {error}</div>
   }
 
   return (
@@ -68,14 +122,14 @@ export default function Home() {
               </div>
               <Button type="submit" className="w-full">Join Course</Button>
             </form>
-            {/* <Button
+            <Button
               variant="ghost"
               size="icon"
               className="absolute right-4 top-4"
               onClick={() => setIsDialogOpen(false)}
-            > */}
-              {/* <X className="h-4 w-4" /> */}
-            {/* </Button> */}
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </DialogContent>
         </Dialog>
       </div>
@@ -86,8 +140,8 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {enrolledCourses.map((course) => (
               <CourseCard
-                key={course.id}
-                id={course.id}
+                key={course._id}
+                id={course._id}
                 title={course.title}
                 description={course.description}
                 assignmentCount={course.assignments.length}
@@ -103,5 +157,4 @@ export default function Home() {
     </div>
   )
 }
-
 

@@ -1,0 +1,1 @@
+### this folder contains both reviewing grades and calibration (ie just looking at them and also grading them with AI. not sure if this is good or what. probably exists a better folder structure? one where shared components are in the parent, and then unique components have their own subfolder)

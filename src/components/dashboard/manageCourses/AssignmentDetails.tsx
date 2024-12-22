@@ -5,20 +5,43 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { CalendarIcon, Edit } from 'lucide-react'
-import { InstructorAssignment } from '@/lib/dummy/instructorCourses'
-import { StatusBadge } from '@/components/dashboard/manageCourses/StatusBadge'
-import { Problem } from '@/lib/dummy/courses'
-import { useToast } from "@/hooks/use-toast"
+import { IAssignment, IProblem } from '@@/models/Assignment'
+import { useToast } from "@/components/ui/use-toast"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 interface AssignmentDetailsProps {
-  assignment: InstructorAssignment
-  editedAssignment: InstructorAssignment
+  assignment: IAssignment
+  editedAssignment: IAssignment
   isEditDialogOpen: boolean
   setIsEditDialogOpen: (isOpen: boolean) => void
-  setEditedAssignment: (assignment: InstructorAssignment) => void
+  setEditedAssignment: (assignment: IAssignment) => void
   handleUpdateAssignment: () => void
   handleStatusChange: () => void
-  problems: Problem[]
+  problems: IProblem[]
+}
+
+const StatusBadge = ({ isPublished }: { isPublished: boolean }) => {
+  const getStatusStyles = () => {
+    return isPublished
+      ? 'bg-green-100 text-green-800'
+      : 'bg-gray-100 text-gray-800'
+  }
+
+  return (
+    <span className={`px-2 py-1 rounded-full text-sm font-medium ${getStatusStyles()}`}>
+      {isPublished ? "Published" : "Not Published"}
+    </span>
+  )
 }
 
 export function AssignmentDetails({
@@ -34,15 +57,28 @@ export function AssignmentDetails({
   const { toast } = useToast()
   const [validationError, setValidationError] = useState<string | null>(null)
 
+  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false)
+
+  const getStatusDialogMessage = () => {
+    const visibilityMessage = assignment.isPublished
+      ? 'will no longer see this assignment'
+      : 'will now be able to see this assignment'
+    
+    return {
+      title: `${assignment.isPublished ? "Un-publish this assignment" : "Publish this assignment"}?`,
+      description: `Are you sure you want to ${assignment.isPublished ? "unpublish" : "publish"} this assignment?  Students ${visibilityMessage}.`
+    }
+  }
+
   const validateAndUpdate = () => {
     const dueDate = new Date(editedAssignment.dueDate)
     const lateDeadline = new Date(editedAssignment.finalSubmissionDeadline)
 
     if (lateDeadline < dueDate) {
-      setValidationError("Late submission deadline cannot be before the due date.")
+      setValidationError("Late due date cannot be before the due date.")
       toast({
         title: "Validation Error",
-        description: "Late submission deadline cannot be before the due date.",
+        description: "Late due date cannot be before the due date.",
         variant: "destructive",
       })
       return
@@ -50,6 +86,16 @@ export function AssignmentDetails({
 
     setValidationError(null)
     handleUpdateAssignment()
+  }
+
+  const formatDate = (date: Date) => {
+    return new Date(date).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
   }
 
   return (
@@ -85,21 +131,35 @@ export function AssignmentDetails({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="edit-due-date">Due Date</Label>
+                  <Label htmlFor="edit-description">Description</Label>
                   <Input
-                    id="edit-due-date"
-                    type="date"
-                    value={editedAssignment?.dueDate}
-                    onChange={(e) => setEditedAssignment({ ...editedAssignment!, dueDate: e.target.value })}
+                    id="edit-description"
+                    value={editedAssignment?.description}
+                    onChange={(e) => setEditedAssignment({ ...editedAssignment!, description: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="edit-late-deadline">Late Submission Deadline</Label>
+                  <Label htmlFor="edit-due-date">Due Date</Label>
                   <Input
-                    id="edit-late-deadline"
-                    type="date"
-                    value={editedAssignment?.finalSubmissionDeadline}
-                    onChange={(e) => setEditedAssignment({ ...editedAssignment!, finalSubmissionDeadline: e.target.value })}
+                    id="edit-due-date"
+                    type="datetime-local"
+                    value={new Date(editedAssignment?.dueDate).toISOString().slice(0, 16)}
+                    onChange={(e) => setEditedAssignment({ 
+                      ...editedAssignment!, 
+                      dueDate: new Date(e.target.value) 
+                    })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-late-due-date">Late Due Date</Label>
+                  <Input
+                    id="edit-late-due-date"
+                    type="datetime-local"
+                    value={new Date(editedAssignment?.finalSubmissionDeadline).toISOString().slice(0, 16)}
+                    onChange={(e) => setEditedAssignment({ 
+                      ...editedAssignment!, 
+                      finalSubmissionDeadline: new Date(e.target.value)
+                    })}
                   />
                 </div>
                 {validationError && (
@@ -115,29 +175,51 @@ export function AssignmentDetails({
             <CalendarIcon className="h-4 w-4 text-muted-foreground" />
             <div>
               <p className="font-semibold">Due:</p>
-              <p className="text-sm text-muted-foreground">{assignment.dueDate}</p>
+              <p className="text-sm text-muted-foreground">
+                {formatDate(assignment.dueDate)}
+              </p>
             </div>
           </div>
           <div className="flex items-center space-x-2">
             <CalendarIcon className="h-4 w-4 text-muted-foreground" />
             <div>
-              <p className="font-semibold">Late Deadline:</p>
-              <p className="text-sm text-muted-foreground">{assignment.finalSubmissionDeadline}</p>
+              <p className="font-semibold">Late Due:</p>
+              <p className="text-sm text-muted-foreground">
+                {formatDate(assignment.finalSubmissionDeadline)}
+              </p>
             </div>
           </div>
           <div>
             <p className="font-semibold">Status:</p>
-            <div onClick={handleStatusChange}>
-              <StatusBadge status={assignment.status} />
+            <div onClick={() => setIsStatusDialogOpen(true)} className="cursor-pointer">
+              <StatusBadge isPublished={assignment.isPublished} />
             </div>
           </div>
           <div>
-            <p className="font-semibold">Problem Count:</p>
+            <p className="font-semibold">Problems:</p>
             <p className="text-sm text-muted-foreground">{problems.length}</p>
           </div>
         </div>
       </CardContent>
+      <AlertDialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{getStatusDialogMessage().title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {getStatusDialogMessage().description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              handleStatusChange()
+              setIsStatusDialogOpen(false)
+            }}>
+              Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }
-
