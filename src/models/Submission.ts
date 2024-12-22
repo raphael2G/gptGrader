@@ -1,5 +1,4 @@
 import mongoose, { Schema } from 'mongoose';
-import { IRubricItem } from '@/models/Assignment';
 
 export type ISubmission = {
   _id?: mongoose.Types.ObjectId;
@@ -11,7 +10,8 @@ export type ISubmission = {
   graded: boolean;
   gradedBy?: mongoose.Types.ObjectId; // Reference to User
   gradedAt?: Date;
-  appliedRubricItems?: IRubricItem[]; // Reference to the RubricItems
+  appliedRubricItems?: mongoose.Types.ObjectId[]; // Reference to the RubricItems that are applied
+  feedback?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -25,7 +25,8 @@ const submissionSchema = new Schema<ISubmission>({
   graded: { type: Boolean, required: true },
   gradedBy: { type: Schema.Types.ObjectId, ref: 'User' },
   gradedAt: { type: Date },
-  appliedRubricItems: [{ type: Schema.Types.ObjectId, ref: 'Assignment.problems.rubric.items' }]
+  appliedRubricItems: [{ type: Schema.Types.ObjectId, ref: 'Assignment.problems.rubric.items' }],
+  feedback: { type: String }
 }, {
   timestamps: true
 });

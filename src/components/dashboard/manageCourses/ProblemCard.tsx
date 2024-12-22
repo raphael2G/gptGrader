@@ -8,7 +8,6 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { DraggableRubricItem } from '@/components/dashboard/manageCourses/DraggableRubricItem'
 import { Textarea } from "@/components/ui/textarea"
-import { Types } from 'mongoose'
 import { IProblem, IRubricItem } from '@/models/Assignment'
 import {
   AlertDialog,

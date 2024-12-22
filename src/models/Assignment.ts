@@ -14,6 +14,8 @@ export type IProblem = {
   rubric: {
     items: IRubricItem[];
   }
+  rubricFinalized?: boolean;
+  referenceSolution?: string;
 }
 
 export type IAssignment = {
@@ -26,6 +28,7 @@ export type IAssignment = {
   status: 'unreleased' | 'released' | 'closed' | 'graded';
   totalPoints: number;
   problems: IProblem[];
+  gradingStatus?: "Not Started" | "In Progress" | "Finsihed"
   createdAt: Date;
   updatedAt: Date;
 }
@@ -41,7 +44,9 @@ const problemSchema = new Schema<IProblem>({
   orderIndex: { type: Number, required: true },
   rubric: {
     items: [rubricItemSchema]
-  }
+  }, 
+  rubricFinalized: { type: Boolean }, 
+  referenceSolution: { type: String }
 });
 
 const assignmentSchema = new Schema<IAssignment>({
@@ -57,7 +62,13 @@ const assignmentSchema = new Schema<IAssignment>({
     required: true
   },
   totalPoints: { type: Number, required: true },
-  problems: [problemSchema]
+  problems: [problemSchema],
+  gradingStatus: {
+    type: String, 
+    enum: ["Not Started", "In Progress", "Finished"], 
+    default: 'Not Started',
+    required: false
+  }
 }, {
   timestamps: true
 });
