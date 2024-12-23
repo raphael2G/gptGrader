@@ -1,28 +1,34 @@
-export interface IDiscrepancyReport {
-  id: string;
-  
-  // References
+export interface IDiscrepancyItem {
+  _id?: string;
   submissionId: string;
   studentId: string;
-  rubricItemId: string;  // Which rubric item is being disputed
+  courseId: string;
+  assignmentId: string;
+  problemId: string;
+  rubricItemId: string;
   
-  // The actual discrepancy
-  selfAssessedScore: number;
-  instructorScore: number;
-  
-  // Student's case
-  discrepancyType: 'student_error' | 'grading_error';  // Student admitting error vs disputing grade
+  wasApplied: boolean;
+  studentThinksShouldBeApplied: boolean;
   studentExplanation: string;
-  
-  // Resolution
-  status: 'pending' | 'resolved';
   resolution?: {
-    finalScore: number;  // The final score after review
-    explanation: string; // Instructor explanation
+    shouldBeApplied: boolean;
+    explanation: string;
+    discrepancyType: 'student_error' | 'grading_error';
     resolvedBy: string;
     resolvedAt: Date;
   };
+}
+
+export interface IDiscrepancyReport {
+  _id?: string;
+  submissionId: string;
+  studentId: string;
+  courseId: string;
+  assignmentId: string;
+  problemId: string;
   
+  status: 'pending' | 'resolved';
+  items: IDiscrepancyItem[];
   createdAt: Date;
   updatedAt: Date;
 }
