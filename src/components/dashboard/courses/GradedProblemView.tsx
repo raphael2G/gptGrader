@@ -15,6 +15,8 @@ import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { CombinedRubricSection } from '@/components/rubrics/CombinedRubricSection';
+import { SelfGradingRubric } from '@/components/rubrics/SelfGradingRubric'
 
 interface GradedProblemViewProps {
   courseId: string;
@@ -124,6 +126,15 @@ export function GradedProblemView({ courseId, assignmentId, problemId }: GradedP
     }
   };
 
+  const handleSelfGradingComplete = (updatedSubmission: ISubmission) => {
+    setSubmission(updatedSubmission);
+    toast({
+      title: 'Success',
+      description: 'Self-grading submitted successfully.',
+    });
+  };
+
+
   if (loading || !assignment || !problem) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -198,183 +209,7 @@ export function GradedProblemView({ courseId, assignmentId, problemId }: GradedP
     </Card>
   );
 
-  const CombinedRubricSection = ({
-    studentSelections,
-    instructorSelections,
-  }: {
-    studentSelections: string[];
-    instructorSelections: string[];
-  }) => {
-    const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
-    const [selectedOption, setSelectedOption] = useState<"student" | "instructor" | null>(null);
-    const [comment, setComment] = useState("");
 
-    const handleRubricItemClick = (itemId: string) => {
-      setExpandedItemId(prevId => prevId === itemId ? null : itemId);
-      setSelectedOption(null); 
-      setComment(""); 
-    };
-
-    const handleSubmit = () => {
-      if (!selectedOption || !comment) {
-        toast({
-          description: "Please select an option and provide a comment.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      alert(`Submitting feedback for rubric item ${expandedItemId}: Option - ${selectedOption}, Comment - ${comment}`);
-
-      setExpandedItemId(null);
-      setSelectedOption(null);
-      setComment("");
-    };
-
-    return (
-      <Card className="w-1/3">
-        <CardHeader>
-          <CardTitle>Grading Comparison</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {problem.rubric.map((item) => {
-              const studentSelected = studentSelections.includes(item.id);
-              const instructorSelected = instructorSelections.includes(item.id);
-              const isPositive = item.points >= 0;
-              const bothSelected = studentSelected && instructorSelected;
-              const onlyStudentSelected = studentSelected && !instructorSelected;
-              const onlyInstructorSelected = !studentSelected && instructorSelected;
-
-              let studentIcon = <Circle className="h-5 w-5 text-gray-400" />;
-              if (studentSelected && isPositive) {
-                studentIcon = <Check className="h-5 w-5 text-green-500" />;
-              } else if (studentSelected && !isPositive) {
-                studentIcon = <X className="h-5 w-5 text-red-500" />;
-              }
-
-              let instructorIcon = <Circle className="h-5 w-5 text-gray-400" />;
-              if (instructorSelected && isPositive) {
-                instructorIcon = <Check className="h-5 w-5 text-green-500" />;
-              } else if (instructorSelected && !isPositive) {
-                instructorIcon = <X className="h-5 w-5 text-red-500" />;
-              }
-
-              let bgColor = "bg-muted";
-              if (bothSelected) {
-                bgColor = isPositive ? "bg-green-100 dark:bg-green-900/30" : "bg-red-100 dark:bg-red-900/30";
-              } else if (onlyStudentSelected) {
-                bgColor = isPositive ? "bg-gradient-to-r from-green-100 via-gray-100 to-gray-100 dark:from-green-900/30 dark:via-gray-800 dark:to-gray-800" : "bg-gradient-to-r from-red-100 via-gray-100 to-gray-100 dark:from-red-900/30 dark:via-gray-800 dark:to-gray-800";
-              } else if (onlyInstructorSelected) {
-                bgColor = isPositive ? "bg-gradient-to-l from-green-100 via-gray-100 to-gray-100 dark:from-green-900/30 dark:via-gray-800 dark:to-gray-800" : "bg-gradient-to-l from-red-100 via-gray-100 to-gray-100 dark:from-red-900/30 dark:via-gray-800 dark:to-gray-800";
-              }
-
-              // Add cursor pointer and hover effect for disputed items only
-              const isDisputed = studentSelected !== instructorSelected;
-              const cursorClass = isDisputed ? "cursor-pointer" : "";
-              const hoverEffect = isDisputed ? "hover:bg-muted/80 dark:hover:bg-muted/50" : "";
-
-              return (
-                <div key={item.id}>
-                  <motion.div
-                    onClick={isDisputed ? () => handleRubricItemClick(item.id) : undefined}
-                    className={`relative flex items-center p-4 rounded-md border border-gray-200 dark:border-gray-700 ${bgColor} ${cursorClass} ${hoverEffect}`}
-                    whileHover={isDisputed ? { scale: 1.02 } : {}}
-                    whileTap={isDisputed ? { scale: 0.98 } : {}}
-                  >
-                    <div className="w-1/2 pr-2">
-                      {studentIcon}
-                    </div>
-                    <div className="flex-grow">
-                      <span className="text-sm">{item.description}</span>
-                      <span className={cn(
-                        "font-semibold text-sm ml-2",
-                        isPositive ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"
-                      )}>
-                        ({item.points > 0 ? '+' : ''}{item.points})
-                      </span>
-                    </div>
-                    <div className="w-1/2 pl-2 text-right">
-                      {instructorIcon}
-                    </div>
-                  </motion.div>
-
-                  <AnimatePresence>
-                    {expandedItemId === item.id && (
-                      <motion.div
-                        layout
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="p-4 bg-muted rounded-md mt-2 space-y-2 border border-gray-200 dark:border-gray-700"
-                      >
-                        <RadioGroup
-                          onValueChange={value => setSelectedOption(value as "student" | "instructor")}
-                          value={selectedOption}
-                        >
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="student" id={`student-${item.id}`} />
-                            <Label htmlFor={`student-${item.id}`}>I am wrong (student)</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="instructor" id={`instructor-${item.id}`} />
-                            <Label htmlFor={`instructor-${item.id}`}>The initial grade is wrong (instructor)</Label>
-                          </div>
-                        </RadioGroup>
-                        <Textarea
-                          placeholder="Enter your comment here..."
-                          value={comment}
-                          onChange={e => setComment(e.target.value)}
-                          className="w-full resize-none border-2 focus:ring-2 focus:ring-primary dark:bg-black"
-                        />
-                        <div className="flex justify-end space-x-2">
-                          <Button variant="outline" onClick={() => setExpandedItemId(null)}>Cancel</Button>
-                          <Button onClick={handleSubmit}>Submit</Button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* <div className="mt-6 p-4 bg-muted rounded-lg space-y-2">
-            <div className="text-sm flex justify-between items-center">
-              <span>Your Self-Grade:</span>
-              <span>{calculatePoints(studentSelections)} / {problem.maxPoints}</span>
-            </div>
-            <div className="text-sm flex justify-between items-center">
-              <span>Instructor's Grade:</span>
-              <span>{calculatePoints(instructorSelections)} / {problem.maxPoints}</span>
-            </div>
-          </div> */}
-          <div className="mt-6 p-4 bg-muted rounded-lg">
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
-                <div className="text-sm text-muted-foreground mb-1">Your Grade</div>
-                <div className="text-xl font-semibold">
-                  {calculatePoints(studentSelections)}
-                </div>
-              </div>
-              <div className="border-x border-border px-4">
-                <div className="text-sm text-muted-foreground mb-1">Total Points</div>
-                <div className="text-xl font-semibold">
-                  {problem.maxPoints}
-                </div>
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground mb-1">Instructor Grade</div>
-                <div className="text-xl font-semibold">
-                  {calculatePoints(instructorSelections)}
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  };
 
   return (
     <div className="flex gap-6">
@@ -410,17 +245,31 @@ export function GradedProblemView({ courseId, assignmentId, problemId }: GradedP
             </CardContent>
           </Card>
 
-          {submission?.selfGraded ? (
-            <CombinedRubricSection 
-              studentSelections={submission.selfAssessedRubricItems?.map(i => i.rubricItemId) || []}
-              instructorSelections={submission.appliedRubricItemIds}
-            />
+          {submission ? (
+            submission.selfGraded ? (
+              <CombinedRubricSection
+                assignmentId={assignmentId}
+                problemId={problemId}
+                studentId={studentId}
+              />
+            ) : (
+              <SelfGradingRubric
+                problem={problem}
+                submission={submission}
+                onSelfGradingComplete={handleSelfGradingComplete}
+              />
+            )
           ) : (
-            <RubricSection
-              selections={selfGradeSelections}
-              isEditable={true}
-              showSubmit={true}
-            />
+            <Card className="w-1/3">
+              <CardHeader>
+                <CardTitle>Grading</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-center text-gray-500 dark:text-gray-400">
+                  No submission available for grading.
+                </p>
+              </CardContent>
+            </Card>
           )}
         </div>
       </div>
