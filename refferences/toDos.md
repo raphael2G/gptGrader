@@ -13,6 +13,7 @@ really should say "course code already in use"
 
 1. managaing rubrics in the manage courses edit course section is not set up to the api yet
 
+
 2. Navigation bar is the same as the calibration one (button at the end says finish calibrating). should not be the case. can fix with simple flag
 /manage-courses/course1/grading/assignment1/problem1/graded/38zc4px1wbz
 
@@ -44,3 +45,9 @@ http://localhost:3000/manage-courses/course1/grading/assignment1/problem1/graded
 
 14. When we are "grading all submissions" with AI, we should probably make a big pop up which doesn't allow the user to click anything on the screen. 
 manage-courses/course1/grading/assignment1/problem2/setup
+
+15. Whenever a student "resolves" a discrepancy, the resovled rubric item always becomes grey, instead of what the resolution suggests it should become
+
+16. in the http://localhost:3000/manage-courses/course1/discrepancy-reports/assignment3/problem2/k1oj96yntf, [submissionId], we are fetching with the student id since get submission by submissionid is not wokring in the clientApi. this will need adjusted when we switch over
+
+17. various places which use the navigation bar. need to make sure each one has the proper buttons for their use case. 
