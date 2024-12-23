@@ -7,7 +7,7 @@ import { BackButton } from '@/components/various/BackButton'
 import { courseApi } from '@/app/lib/client-api/courses'
 import { ICourse } from '@/app/models/Course'
 import Link from 'next/link'
-import { BookOpen, Users, GraduationCap } from 'lucide-react'
+import { BookOpen, Users, GraduationCap, FileWarning } from 'lucide-react'
 import { useToast } from "@/components/ui/use-toast"
 
 export default function CourseManagementPage({ params }: { params: { courseId: string } }) {
@@ -69,7 +69,7 @@ export default function CourseManagementPage({ params }: { params: { courseId: s
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
         <Link href={`/manage-courses/${course._id}/assignments`} className="block">
           <Card className="h-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer">
             <CardContent className="flex flex-col items-center justify-center h-full py-6">
@@ -98,6 +98,16 @@ export default function CourseManagementPage({ params }: { params: { courseId: s
               <GraduationCap className="h-12 w-12 mb-4" />
               <CardTitle>Grading</CardTitle>
               <p className="text-center mt-2">Manage assignment grading</p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href={`/manage-courses/${course._id}/discrepancy-reports`} className="block">
+          <Card className="h-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer">
+            <CardContent className="flex flex-col items-center justify-center h-full py-6">
+              <FileWarning className="h-12 w-12 mb-4" />
+              <CardTitle>Discrepancy Reports</CardTitle>
+              <p className="text-center mt-2">Manage discrepancy reports</p>
             </CardContent>
           </Card>
         </Link>
