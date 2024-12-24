@@ -299,7 +299,7 @@ export const submissions: ISubmission[] = [
 //     selfGradingStatus: 'pending',
 //   },
   {
-    _id: createObjectId(),
+    _id: '1',
     assignmentId: 'assignment3', // Control Structures in Python
     problemId: 'problem2', // Question 2
     studentId: '1',
