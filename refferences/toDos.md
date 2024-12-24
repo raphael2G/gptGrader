@@ -51,3 +51,7 @@ manage-courses/course1/grading/assignment1/problem2/setup
 16. in the http://localhost:3000/manage-courses/course1/discrepancy-reports/assignment3/problem2/k1oj96yntf, [submissionId], we are fetching with the student id since get submission by submissionid is not wokring in the clientApi. this will need adjusted when we switch over
 
 17. various places which use the navigation bar. need to make sure each one has the proper buttons for their use case. 
+
+18. in the discrepancy reports, clicking on a resolved discrepancy report should open up what it was
+
+19. in the student view of discrepancy reports, we need to place everything in better boxes. the professor discrepency reports look good and format things well, while the student ones is just a bunch of text
