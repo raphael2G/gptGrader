@@ -48,10 +48,10 @@ export function DiscrepancyReportsTable({
       setLoading(true)
       try {
         console.log(`Fetching discrepancy reports for assignment ${assignmentId} and problem ${problemId}`);
-        const response = await discrepancyReportApi.getDiscrepancyReportsByProblem(assignmentId, problemId)
+        const response = await discrepancyReportApi.getDiscrepancyReportsByAssignment(assignmentId)
         if (response.data) {
-          console.log(`Received ${response.data.length} discrepancy reports`);
-          const formattedReports: DiscrepancyReport[] = response.data.map(report => ({
+          const problemFilteredReports = response.data.filter(report => report.problemId === problemId)
+          const formattedReports: DiscrepancyReport[] = problemFilteredReports.map(report => ({
             studentId: report.studentId,
             studentName: report.studentName || 'Unknown Student',
             studentGrade: report.studentGrade || 0,
@@ -137,7 +137,7 @@ export function DiscrepancyReportsTable({
                       href={`/manage-courses/${courseId}/discrepancy-reports/${assignmentId}/${problemId}/${report.submissionId}`}
                       className="text-blue-600 hover:underline"
                     >
-                      {report.studentName}
+                      {report.studentId}
                     </Link>
                   </TableCell>
                   <TableCell className="text-right">{report.studentGrade}</TableCell>
