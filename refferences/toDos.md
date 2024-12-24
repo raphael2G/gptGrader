@@ -63,3 +63,5 @@ manage-courses/course1/grading/assignment1/problem2/setup
 22. student submit is not updating. confetti is not coming down. it does submit, just cannot see right awya
 
 23. toast is broken in some places
+
+24. i think some of hte discrepancy issues are because of the api, which means we will fix that once we swap over the api
