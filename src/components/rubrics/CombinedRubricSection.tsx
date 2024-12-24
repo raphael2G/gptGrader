@@ -161,9 +161,10 @@ export function CombinedRubricSection({ assignmentId, problemId, studentId }: Co
 
             let bgColor = "bg-muted";
             if (isResolved) {
-              bgColor = studentSelected === instructorSelected
+              const instructorApplied = discrepancyItem?.resolution?.shouldBeApplied;
+              bgColor = instructorApplied
                 ? (isPositive ? "bg-green-100 dark:bg-green-900/30" : "bg-red-100 dark:bg-red-900/30")
-                : "bg-gray-100 dark:bg-gray-800";
+                : "bg-gray-200 dark:bg-gray-700";
             } else if (studentSelected && instructorSelected) {
               bgColor = isPositive ? "bg-green-100 dark:bg-green-900/30" : "bg-red-100 dark:bg-red-900/30";
             } else if (studentSelected && !instructorSelected) {
@@ -218,7 +219,6 @@ export function CombinedRubricSection({ assignmentId, problemId, studentId }: Co
                     </div>
                   )}
                 </motion.div>
-
                 <AnimatePresence>
                   {expandedItemId === item.id && (isDisputed || discrepancyItem) && (
                     <motion.div
@@ -226,22 +226,50 @@ export function CombinedRubricSection({ assignmentId, problemId, studentId }: Co
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="p-4 bg-muted rounded-md mt-2 space-y-2 border border-gray-200 dark:border-gray-700"
+                      className="p-4 bg-muted rounded-md mt-2 space-y-4 border border-gray-200 dark:border-gray-700"
                     >
                       {discrepancyItem ? (
                         <>
-                          <h4 className="font-semibold mb-2">Discrepancy Report</h4>
-                          <p className="mb-2"><strong>Student's Explanation:</strong> {discrepancyItem.studentExplanation}</p>
-                          {discrepancyItem.resolution ? (
-                            <>
-                              <h5 className="font-semibold mt-4 mb-2">Professor's Resolution</h5>
-                              <p><strong>Decision:</strong> {discrepancyItem.resolution.shouldBeApplied ? "Apply rubric item" : "Do not apply rubric item"}</p>
-                              <p><strong>Explanation:</strong> {discrepancyItem.resolution.explanation}</p>
-                              <p><strong>Discrepancy Type:</strong> {discrepancyItem.resolution.discrepancyType === 'student_error' ? 'Student Error' : 'Grading Error'}</p>
-                            </>
-                          ) : (
-                            <p className="text-yellow-600 dark:text-yellow-400">This discrepancy is pending resolution.</p>
-                          )}
+                          <h4 className="font-semibold mb-4">Discrepancy Report</h4>
+                          <div className="space-y-4">
+                            <div>
+                              <h5 className="text-sm font-semibold text-muted-foreground mb-1">Student's Explanation:</h5>
+                              <div className="mt-2 text-sm prose max-w-none">
+                                <p className="pl-4 text-sm text-muted-foreground">
+                                  {discrepancyItem.studentExplanation || "No explanation provided by the student."}
+                                </p>
+                              </div>
+
+                            </div>
+                            {discrepancyItem.resolution && (
+                              <>
+                                <div>
+                                  <h5 className="text-sm font-semibold text-muted-foreground mb-1">Instructor's Feedback:</h5>
+                                  <div className="mt-2 text-sm prose max-w-none">
+                                    <p className="pl-4 text-sm text-muted-foreground">
+                                      {discrepancyItem.resolution.explanation}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex justify-between items-center mt-4">
+                                  <Badge variant="default" className={
+                                    discrepancyItem.resolution.shouldBeApplied
+                                      ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
+                                      : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100"
+                                  }>
+                                    {discrepancyItem.resolution.shouldBeApplied ? "Apply Rubric Item" : "Do Not Apply Rubric Item"}
+                                  </Badge>
+                                  <Badge variant="outline" className={
+                                    discrepancyItem.resolution.discrepancyType === 'student_error'
+                                      ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100"
+                                      : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100"
+                                  }>
+                                    {discrepancyItem.resolution.discrepancyType === 'student_error' ? 'Student Error' : 'Grading Error'}
+                                  </Badge>
+                                </div>
+                              </>
+                            )}
+                          </div>
                         </>
                       ) : isDisputed ? (
                         <>

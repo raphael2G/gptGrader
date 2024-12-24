@@ -14,6 +14,7 @@ import { submissionApi } from '@/app/lib/client-api/submissions';
 import { discrepancyReportApi } from '@/app/lib/client-api/discrepancyReports';
 import { IProblem } from '@@/models/Assignment';
 import { ISubmission } from '@@/models/Submission';
+import { IDiscrepancyReport, IDiscrepancyItem } from '@@/models/DiscrepancyReport';
 import { cn } from "@/lib/utils";
 
 interface ProfessorDisputeReviewSectionProps {
@@ -23,11 +24,6 @@ interface ProfessorDisputeReviewSectionProps {
   onSubmissionUpdate: (updatedSubmission: ISubmission) => void;
 }
 
-interface StudentExplanation {
-  rubricItemId: string;
-  explanation: string;
-}
-
 export const ProfessorDisputeReviewSection: React.FC<ProfessorDisputeReviewSectionProps> = ({
   problem,
   submission,
@@ -35,47 +31,35 @@ export const ProfessorDisputeReviewSection: React.FC<ProfessorDisputeReviewSecti
   onSubmissionUpdate
 }) => {
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
-  const [selectedOption, setSelectedOption] = useState<"student" | "instructor" | null>(null);
+  const [selectedResolution, setSelectedResolution] = useState<'student_error' | 'grading_error' | null>(null);
+  const [shouldBeApplied, setShouldBeApplied] = useState<boolean | null>(null);
   const [comment, setComment] = useState("");
-  const [resolvedItems, setResolvedItems] = useState<Record<string, 'student' | 'instructor'>>({});
-  const [studentExplanations, setStudentExplanations] = useState<StudentExplanation[]>([]);
+  const [discrepancyReport, setDiscrepancyReport] = useState<IDiscrepancyReport | null>(null);
   const { toast } = useToast();
 
   const studentSelections = submission?.selfAssessedRubricItems?.map(i => i.rubricItemId) || [];
   const instructorSelections = submission?.appliedRubricItemIds || [];
 
-  console.log("ProfessorDisputeReviewSection rendered with submission:", submission);
-
   useEffect(() => {
-    const fetchStudentExplanations = async () => {
+    const fetchDiscrepancyReport = async () => {
       if (submission?._id) {
         try {
-          console.log("Fetching explanations for submission:", submission._id);
           const response = await discrepancyReportApi.getDiscrepancyReportsBySubmission(submission._id);
-          console.log("API response:", response);
-          if (response.data) {
-            setStudentExplanations(response.data.map(report => ({
-              rubricItemId: report.rubricItemId,
-              explanation: report.studentExplanation
-            })));
-          } else {
-            console.error("No data in API response:", response);
+          if (response.data && response.data.length > 0) {
+            setDiscrepancyReport(response.data[0]); // Assuming one report per submission
           }
         } catch (error: any) {
-          console.error("Failed to fetch student explanations:", error);
-          console.error("Error details:", error.message, error.stack);
+          console.error("Failed to fetch discrepancy report:", error);
           toast({
             title: "Error",
-            description: `Failed to fetch student explanations: ${error.message}`,
+            description: `Failed to fetch discrepancy report: ${error.message}`,
             variant: "destructive",
           });
         }
-      } else {
-        console.log("No submission ID available, skipping explanation fetch");
       }
     };
 
-    fetchStudentExplanations();
+    fetchDiscrepancyReport();
   }, [submission?._id, toast]);
 
   const calculatePoints = (selectedItems: string[]) => {
@@ -84,55 +68,102 @@ export const ProfessorDisputeReviewSection: React.FC<ProfessorDisputeReviewSecti
     );
   };
 
+  const getDiscrepancyItem = (rubricItemId: string): IDiscrepancyItem | undefined => {
+    return discrepancyReport?.items.find(item => item.rubricItemId === rubricItemId);
+  };
+
   const handleRubricItemClick = (itemId: string) => {
+    const discrepancyItem = getDiscrepancyItem(itemId);
+    if (!discrepancyItem) return;
+    
     setExpandedItemId(prevId => prevId === itemId ? null : itemId);
-    setSelectedOption(null);
-    setComment("");
+    if (discrepancyItem.resolution) {
+      setSelectedResolution(discrepancyItem.resolution.discrepancyType);
+      setShouldBeApplied(discrepancyItem.resolution.shouldBeApplied);
+      setComment(discrepancyItem.resolution.explanation);
+    } else {
+      setSelectedResolution(null);
+      setShouldBeApplied(null);
+      setComment("");
+    }
   };
 
   const handleSubmit = async () => {
-    if (!selectedOption || !comment || !expandedItemId || !submission) {
-      alert("Please selection an option and provide a comment")
+    console.log("selected resolution: ", selectedResolution)
+    console.log("shouldBeApplied: ", shouldBeApplied)
+    console.log("comment: ", comment)
+    console.log("expandedItemId: ", expandedItemId)
+    console.log("submission?._id: ", submission?._id)
+    console.log("discrepancyReport?._id: ", discrepancyReport?._id)
+    if (!selectedResolution || !comment || !expandedItemId || !submission?._id || !discrepancyReport?._id) {
+
+      alert("fail")
+
+
       toast({
-        description: "Please select an option and provide a comment.",
+        description: "Please complete all fields before submitting.",
         variant: "destructive",
       });
       return;
     }
 
     try {
-      const response = await discrepancyReportApi.resolveDiscrepancyReport(submission._id!, expandedItemId, {
-        resolution: selectedOption,
-        explanation: comment,
-      });
+      // Resolve the specific discrepancy item
+      const response = await discrepancyReportApi.resolveDiscrepancyItem(
+        submission?._id,
+        expandedItemId,
+        {
+          shouldBeApplied: true,
+          explanation: comment,
+          discrepancyType: selectedResolution
+        }
+      );
 
       if (response.data) {
-        const updatedSubmission = await submissionApi.updateSubmission(submission._id!, {
-          appliedRubricItemIds: selectedOption === 'student' 
-            ? [...instructorSelections, expandedItemId]
-            : instructorSelections.filter(id => id !== expandedItemId),
+        // Update submission's applied rubric items based on resolution
+        const updatedAppliedItems = shouldBeApplied
+          ? [...instructorSelections, expandedItemId]
+          : instructorSelections.filter(id => id !== expandedItemId);
+
+        const updatedSubmission = await submissionApi.updateSubmission(submission._id, {
+          appliedRubricItemIds: updatedAppliedItems,
         });
 
         if (updatedSubmission.data) {
           onSubmissionUpdate(updatedSubmission.data);
-          setResolvedItems(prev => ({
-            ...prev,
-            [expandedItemId]: selectedOption
-          }));
+          
+          // Update local discrepancy report state
+          setDiscrepancyReport(prev => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              items: prev.items.map(item => 
+                item.rubricItemId === expandedItemId
+                  ? {
+                      ...item,
+                      resolution: {
+                        shouldBeApplied,
+                        explanation: comment,
+                        discrepancyType: selectedResolution,
+                        resolvedBy: 'instructor', // This should come from auth context
+                        resolvedAt: new Date()
+                      }
+                    }
+                  : item
+              )
+            };
+          });
 
           toast({
             title: "Success",
             description: "Dispute resolved successfully.",
           });
-        } else {
-          throw new Error(updatedSubmission.error?.error || 'Failed to update submission');
         }
-      } else {
-        throw new Error(response.error?.error || 'Failed to resolve discrepancy report');
       }
 
       setExpandedItemId(null);
-      setSelectedOption(null);
+      setSelectedResolution(null);
+      setShouldBeApplied(null);
       setComment("");
     } catch (error: any) {
       alert(error.message)
@@ -145,6 +176,157 @@ export const ProfessorDisputeReviewSection: React.FC<ProfessorDisputeReviewSecti
     }
   };
 
+  const renderRubricItem = (item: any) => {
+    const studentSelected = studentSelections.includes(item.id);
+    const instructorSelected = instructorSelections.includes(item.id);
+    const isPositive = item.points >= 0;
+    const discrepancyItem = getDiscrepancyItem(item.id);
+    const hasDiscrepancy = Boolean(discrepancyItem);
+    const isResolved = Boolean(discrepancyItem?.resolution);
+    
+    const studentIcon = studentSelected
+      ? (isPositive ? <Check className="h-5 w-5 text-green-500" /> : <X className="h-5 w-5 text-red-500" />)
+      : <Circle className="h-5 w-5 text-gray-400" />;
+
+    const instructorIcon = instructorSelected
+      ? (isPositive ? <Check className="h-5 w-5 text-green-500" /> : <X className="h-5 w-5 text-red-500" />)
+      : <Circle className="h-5 w-5 text-gray-400" />;
+
+    let bgColor = "bg-muted";
+    if (hasDiscrepancy) {
+
+      if (isResolved) {
+        const instructorApplied = discrepancyItem?.resolution?.shouldBeApplied;
+        bgColor = instructorApplied
+          ? (isPositive ? "bg-green-100 dark:bg-green-900/30" : "bg-red-100 dark:bg-red-900/30")
+          : "bg-gray-200 dark:bg-gray-700";
+      }
+
+      bgColor = (isPositive ? "bg-green-100 dark:bg-green-900/30" : "bg-red-100 dark:bg-red-900/30");
+
+    }
+
+    return (
+      <div key={item.id}>
+        <motion.div
+          onClick={hasDiscrepancy ? () => handleRubricItemClick(item.id) : undefined}
+          className={`relative flex items-center p-4 rounded-md border border-gray-200 dark:border-gray-700 ${bgColor} ${hasDiscrepancy ? "cursor-pointer transition-transform" : ""}`}
+          whileHover={hasDiscrepancy ? { scale: 1.02 } : {}}
+          whileTap={hasDiscrepancy ? { scale: 0.98 } : {}}
+        >
+          <div className="w-1/2 pr-2">{studentIcon}</div>
+          <div className="flex-grow">
+            <span className="text-sm">{item.description}</span>
+            <span className={cn(
+              "font-semibold text-sm ml-2",
+              isPositive ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"
+            )}>
+              ({item.points > 0 ? '+' : ''}{item.points})
+            </span>
+          </div>
+          <div className="w-1/2 pl-2 text-right">{instructorIcon}</div>
+          
+          {hasDiscrepancy && (
+            <div className="absolute top-0 right-0 mt-1 mr-1">
+              <Badge 
+                variant="outline" 
+                className={cn(
+                  "text-xs",
+                  isResolved
+                    ? "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200"
+                    : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                )}
+              >
+                {isResolved ? 'Resolved' : 'Pending'}
+              </Badge>
+            </div>
+          )}
+        </motion.div>
+
+        <AnimatePresence>
+          {expandedItemId === item.id && discrepancyItem && (
+            <motion.div
+              layout
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="p-4 bg-muted rounded-md mt-2 space-y-4 border border-gray-200 dark:border-gray-700"
+            >
+
+
+              <div>
+                <h5 className="text-sm font-semibold text-muted-foreground mb-1">Student's Explanation:</h5>
+                <div className="mt-2 text-sm prose max-w-none">
+                  <p className="pl-4 text-sm text-muted-foreground">
+                    {discrepancyItem.studentExplanation || "No explanation provided by the student."}
+                  </p>
+                </div>
+              </div>
+              
+              {discrepancyItem.resolution ? (
+                <>
+                  <div>
+                    <h5 className="text-sm font-semibold text-muted-foreground mb-1">Instructor's Feedback:</h5>
+                    <div className="mt-2 text-sm prose max-w-none">
+                      <p className="pl-4 text-sm text-muted-foreground">
+                        {discrepancyItem.resolution.explanation}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center mt-4">
+                    <Badge variant="default" className={
+                      discrepancyItem.resolution.shouldBeApplied
+                        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
+                        : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100"
+                    }>
+                      {discrepancyItem.resolution.shouldBeApplied ? "Apply Rubric Item" : "Do Not Apply Rubric Item"}
+                    </Badge>
+                    <Badge variant="outline" className={
+                      discrepancyItem.resolution.discrepancyType === 'student_error'
+                        ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100"
+                        : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100"
+                    }>
+                      {discrepancyItem.resolution.discrepancyType === 'student_error' ? 'Student Error' : 'Grading Error'}
+                    </Badge>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <RadioGroup
+                    onValueChange={(value: 'student_error' | 'grading_error') => setSelectedResolution(value)}
+                    value={selectedResolution}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="student_error" id={`student-error-${item.id}`} />
+                      <Label htmlFor={`student-error-${item.id}`}>I agree with student</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="grading_error" id={`grading-error-${item.id}`} />
+                      <Label htmlFor={`grading-error-${item.id}`}>I agree with original grading</Label>
+                    </div>
+                  </RadioGroup>
+
+
+
+                  <Textarea
+                    placeholder="Enter your resolution explanation here..."
+                    value={comment}
+                    onChange={e => setComment(e.target.value)}
+                    className="w-full resize-none border-2 focus:ring-2 focus:ring-primary dark:bg-black"
+                  />
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="outline" onClick={() => setExpandedItemId(null)}>Cancel</Button>
+                    <Button onClick={handleSubmit}>Resolve Dispute</Button>
+                  </div>
+                </>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  };
+
   return (
     <Card className="w-full">
       <CardHeader>
@@ -152,116 +334,7 @@ export const ProfessorDisputeReviewSection: React.FC<ProfessorDisputeReviewSecti
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {problem.rubric.map((item) => {
-            const studentSelected = studentSelections.includes(item.id);
-            const instructorSelected = instructorSelections.includes(item.id);
-            const isPositive = item.points >= 0;
-            const isResolved = item.id in resolvedItems;
-            const isDisputed = studentSelected !== instructorSelected;
-
-            let studentIcon = studentSelected
-              ? (isPositive ? <Check className="h-5 w-5 text-green-500" /> : <X className="h-5 w-5 text-red-500" />)
-              : <Circle className="h-5 w-5 text-gray-400" />;
-
-            let instructorIcon = instructorSelected
-              ? (isPositive ? <Check className="h-5 w-5 text-green-500" /> : <X className="h-5 w-5 text-red-500" />)
-              : <Circle className="h-5 w-5 text-gray-400" />;
-
-            let bgColor = "bg-muted";
-            if (isResolved) {
-              bgColor = resolvedItems[item.id] === 'student'
-                ? (isPositive ? "bg-green-100 dark:bg-green-900/30" : "bg-red-100 dark:bg-red-900/30")
-                : "bg-gray-100 dark:bg-gray-800";
-            } else if (isDisputed) {
-              bgColor = isPositive ? "bg-green-100 dark:bg-green-900/30" : "bg-red-100 dark:bg-red-900/30";
-            }
-
-            const cursorClass = isDisputed ? "cursor-pointer" : "";
-            const hoverEffect = isDisputed ? "transition-transform" : "";
-
-            const studentExplanation = studentExplanations.find(exp => exp.rubricItemId === item.id)?.explanation;
-
-            return (
-              <div key={item.id}>
-                <motion.div
-                  onClick={isDisputed ? () => handleRubricItemClick(item.id) : undefined}
-                  className={`relative flex items-center p-4 rounded-md border border-gray-200 dark:border-gray-700 ${bgColor} ${cursorClass} ${hoverEffect}`}
-                  whileHover={isDisputed ? { scale: 1.02 } : {}}
-                  whileTap={isDisputed ? { scale: 0.98 } : {}}
-                >
-                  <div className="w-1/2 pr-2">
-                    {studentIcon}
-                  </div>
-                  <div className="flex-grow">
-                    <span className="text-sm">{item.description}</span>
-                    <span className={cn(
-                      "font-semibold text-sm ml-2",
-                      isPositive ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"
-                    )}>
-                      ({item.points > 0 ? '+' : ''}{item.points})
-                    </span>
-                  </div>
-                  <div className="w-1/2 pl-2 text-right">
-                    {instructorIcon}
-                  </div>
-                  {isResolved && (
-                    <div className="absolute top-0 right-0 mt-1 mr-1">
-                      <Badge variant="outline" className="text-xs">Resolved</Badge>
-                    </div>
-                  )}
-                  {isDisputed && !isResolved && (
-                    <div className="absolute top-0 right-0 mt-1 mr-1">
-                      <Badge variant="outline" className="text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">Pending</Badge>
-                    </div>
-                  )}
-                </motion.div>
-
-                <AnimatePresence>
-                  {expandedItemId === item.id && !isResolved && (
-                    <motion.div
-                      layout
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="p-4 bg-muted rounded-md mt-2 space-y-4 border border-gray-200 dark:border-gray-700"
-                    >
-                      <div className="mb-4">
-                        <h4 className="text-sm font-semibold mb-2">Student's Explanation:</h4>
-                        {studentExplanation ? (
-                          <p className="text-sm italic bg-gray-100 dark:bg-gray-800 p-3 rounded">{studentExplanation}</p>
-                        ) : (
-                          <p className="text-sm italic bg-gray-100 dark:bg-gray-800 p-3 rounded text-gray-500">No explanation provided by the student.</p>
-                        )}
-                      </div>
-                      <RadioGroup
-                        onValueChange={value => setSelectedOption(value as "student" | "instructor")}
-                        value={selectedOption}
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="student" id={`student-${item.id}`} />
-                          <Label htmlFor={`student-${item.id}`}>Agree with student</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="instructor" id={`instructor-${item.id}`} />
-                          <Label htmlFor={`instructor-${item.id}`}>Maintain instructor's grade</Label>
-                        </div>
-                      </RadioGroup>
-                      <Textarea
-                        placeholder="Enter your resolution comment here..."
-                        value={comment}
-                        onChange={e => setComment(e.target.value)}
-                        className="w-full resize-none border-2 focus:ring-2 focus:ring-primary dark:bg-black"
-                      />
-                      <div className="flex justify-end space-x-2">
-                        <Button variant="outline" onClick={() => setExpandedItemId(null)}>Cancel</Button>
-                        <Button onClick={handleSubmit}>Resolve Dispute</Button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            );
-          })}
+          {problem.rubric.map(renderRubricItem)}
         </div>
 
         <div className="mt-6 p-4 bg-muted rounded-lg">
@@ -289,5 +362,4 @@ export const ProfessorDisputeReviewSection: React.FC<ProfessorDisputeReviewSecti
       </CardContent>
     </Card>
   );
-};
-
+}
