@@ -55,3 +55,11 @@ manage-courses/course1/grading/assignment1/problem2/setup
 18. in the discrepancy reports, clicking on a resolved discrepancy report should open up what it was
 
 19. in the student view of discrepancy reports, we need to place everything in better boxes. the professor discrepency reports look good and format things well, while the student ones is just a bunch of text
+
+20. error with background colors in both combined rubric, and professor combined rubric view
+
+21. right now combined rubric and professor view of rubric are very very similar. should probably make them one component with flag for if professor or if student
+
+22. student submit is not updating. confetti is not coming down. it does submit, just cannot see right awya
+
+23. toast is broken in some places
