@@ -1,8 +1,7 @@
 import { IDiscrepancyReport, IDiscrepancyItem } from '@@/models/DiscrepancyReport';
 import { simulateApiDelay } from '../utils/apiDelay';
-import { IRubricItem } from '@@/models/Assignment'; // Import IRubricItem
-import { submissionApi } from './submissions';
-import { userApi } from './users';
+import { IRubricItem } from '@@/models/Assignment';
+
 
 interface ApiError {
   error: string;
@@ -25,12 +24,6 @@ const loadDiscrepancyReports = (): IDiscrepancyReport[] => {
   return [];
 };
 
-// Save discrepancy reports to localStorage
-const saveDiscrepancyReports = (reports: IDiscrepancyReport[]) => {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem('discrepancyReports', JSON.stringify(reports));
-  }
-};
 
 let discrepancyReports: IDiscrepancyReport[] = loadDiscrepancyReports();
 
@@ -54,7 +47,7 @@ export const discrepancyReportApi = {
           items: [...discrepancyReports[existingReportIndex].items, discrepancyItem],
           updatedAt: new Date()
         };
-        
+                
         return {
           success: true,
           data: discrepancyReports[existingReportIndex]
@@ -73,13 +66,11 @@ export const discrepancyReportApi = {
           updatedAt: new Date()
         };
         discrepancyReports.push(newReport);
-        existingReport = newReport;
+        return { data: newReport };
       }
 
-      saveDiscrepancyReports(discrepancyReports);
 
 
-      return { data: existingReport };
     } catch (err) {
       console.error('Error creating/updating discrepancy report:', err);
       return {
@@ -104,6 +95,7 @@ export const discrepancyReportApi = {
   },
 
   getDiscrepancyReportsByAssignment: async (assignmentId: string): Promise<{ data: IDiscrepancyReport[] | null; error?: ApiError }> => {
+
     await simulateApiDelay();
     try {
       const reports = discrepancyReports.filter(report => report.assignmentId === assignmentId);
@@ -117,56 +109,10 @@ export const discrepancyReportApi = {
     }
   },
 
-  getDiscrepancyReportsByProblem: async (assignmentId: string, problemId: string): Promise<{ data: IDiscrepancyReport[] | null; error?: ApiError }> => {
-    await simulateApiDelay();
-    try {
-      console.log(`Fetching discrepancy reports for assignment ${assignmentId} and problem ${problemId}`);
-      const reports = discrepancyReports.filter(report => 
-        report.assignmentId === assignmentId && report.problemId === problemId
-      );
-      console.log(`Found ${reports.length} reports`);
-  
-      // Fetch additional data (student names, grades) that we need for the table
-      const enhancedReports = await Promise.all(reports.map(async (report) => {
-        console.log(`Processing report for submission ${report.submissionId}`);
-        let submissionData = null;
-        let studentData = null;
 
-        try {
-          const submission = await submissionApi.getSubmissionById(report.submissionId);
-          submissionData = submission.data;
-        } catch (submissionError) {
-          console.error(`Failed to fetch submission data for ${report.submissionId}:`, submissionError);
-        }
-
-        try {
-          const student = await userApi.getUserById(report.studentId);
-          studentData = student.data;
-        } catch (studentError) {
-          console.error(`Failed to fetch student data for ${report.studentId}:`, studentError);
-        }
-        
-        return {
-          ...report,
-          studentName: studentData?.name || 'Unknown Student',
-          studentGrade: submissionData?.selfGrade || 0,
-          professorGrade: submissionData?.appliedRubricItemIds?.length || 0,
-          finalGrade: submissionData?.graded ? (submissionData?.appliedRubricItemIds?.length || 0) : undefined,
-        };
-      }));
-
-      console.log(`Processed ${enhancedReports.length} enhanced reports`);
-      return { data: enhancedReports };
-    } catch (err) {
-      console.error('Error fetching discrepancy reports by problem:', err);
-      return {
-        data: null,
-        error: { error: 'Failed to fetch discrepancy reports for problem', details: err.message }
-      };
-    }
-  },
   getDiscrepancyReportStatsByRubricItem: async (assignmentId: string, problemId: string, problemRubric: IRubricItem[]): Promise<Record<string, number>> => {
     await simulateApiDelay();
+
 
     // Fetch discrepancy reports related to the given assignment and problem
     const assignmentReports = discrepancyReports.filter(report => report.assignmentId === assignmentId && report.problemId === problemId);
@@ -180,12 +126,14 @@ export const discrepancyReportApi = {
 
     return stats;
   },
-  resolveDiscrepancyReport: async (
+  
+  resolveDiscrepancyItem: async (
     submissionId: string,
     rubricItemId: string,
     resolutionData: { resolution: 'student' | 'instructor'; explanation: string }
   ): Promise<DiscrepancyReportApiResponse> => {
     await simulateApiDelay();
+
   
     try {
       const report = discrepancyReports.find(r => r.submissionId === submissionId);
@@ -210,12 +158,14 @@ export const discrepancyReportApi = {
         report.status = 'resolved';
       }
       report.updatedAt = new Date();
-      saveDiscrepancyReports(discrepancyReports);
+
       return { data: report };
     } catch (error) {
       console.error('Error resolving discrepancy report:', error);
       return { data: null, error: { error: 'Failed to resolve discrepancy report' } };
     }
+
+
   },
 };
 
