@@ -1,123 +1,47 @@
-import { Assignment } from '@/models/Assignment';
-import { Course } from '@/models/Course';
-import { Submission } from '@/models/Submission';
-import { Types } from 'mongoose';
-import mongoose from 'mongoose';
-import dbConnect from '@/lib/mongodb/dbConnect';
+// src/queries/submissionQueries.ts
 
+import { Types } from 'mongoose';
+import { Submission, ISubmission } from '@/models/Submission';
+
+interface CreateSubmissionData {
+  assignmentId: Types.ObjectId;
+  problemId: Types.ObjectId;
+  studentId: Types.ObjectId;
+  answer: string;
+}
 
 /**
- * Creates a new submission or updates an existing one for a specific problem in an assignment.
- * If a submission already exists, it will be updated with the new answer and all grading data will be reset.
- * 
- * @param assignmentId - MongoDB ObjectId of the assignment being submitted to
- * @param problemId - MongoDB ObjectId of the specific problem within the assignment
- * @param studentId - MongoDB ObjectId of the student making the submission
- * @param answer - The student's answer text
- * 
- * @returns Promise containing the created or updated submission document
- * 
- * @throws {Error} If:
- * - Assignment doesn't exist
- * - Assignment is not in 'released' status
- * - Problem doesn't exist in the assignment
- * - Student is not enrolled in the course
- * - Submission deadline (including late submission) has passed
- * - Database transaction fails
- * 
- * @example
- * ```typescript
- * try {
- *   const submission = await submitAnswerQuery(
- *     new Types.ObjectId("assignment123"),
- *     new Types.ObjectId("problem456"),
- *     new Types.ObjectId("student789"),
- *     "My answer to the problem"
- *   );
- *   console.log("Submission successful:", submission);
- * } catch (error) {
- *   console.error("Submission failed:", error.message);
- * }
- * ```
+ * Creates a new submission for a problem
+ * @param submissionData Data required to create a submission
+ * @returns The created submission document
  */
-export const submitAnswerQuery = async (
-  assignmentId: Types.ObjectId,
-  problemId: Types.ObjectId,
-  studentId: Types.ObjectId,
-  answer: string
-) => {
-  await dbConnect();
-  
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
+export async function createSubmissionQuery(submissionData: CreateSubmissionData): Promise<ISubmission> {
   try {
-    // Get assignment and validate it exists
-    const assignment = await Assignment.findById(assignmentId).session(session);
-    if (!assignment) {
-      throw new Error('Assignment not found');
+    // Check if a submission already exists for this student and problem
+    const existingSubmission = await Submission.findOne({
+      assignmentId: submissionData.assignmentId,
+      problemId: submissionData.problemId,
+      studentId: submissionData.studentId
+    });
+
+    if (existingSubmission) {
+      throw new Error('A submission already exists for this student and problem');
     }
 
-    // Validate assignment is released
-    if (assignment.status !== 'released') {
-      throw new Error('Assignment is not currently accepting submissions');
-    }
+    // Create the new submission with initial values
+    const newSubmission = new Submission({
+      ...submissionData,
+      submittedAt: new Date(),
+      graded: false,
+      selfGraded: false,
+      selfGradedAppliedRubricItems: [],
+      appliedRubricItems: []
+    });
 
-    // Validate problem exists in assignment
-    const problem = assignment.problems.id(problemId);
-    if (!problem) {
-      throw new Error('Problem not found in assignment');
-    }
-
-    // Validate student is enrolled in the course
-    const course = await Course.findById(assignment.courseId)
-      .select('students')
-      .session(session);
-    
-    if (!course?.students.includes(studentId)) {
-      throw new Error('Student is not enrolled in this course');
-    }
-
-    // Check submission deadline
-    const now = new Date();
-    if (now > assignment.lateDueDate) {
-      throw new Error('Submission deadline has passed');
-    }
-
-    // Check for existing submission
-    let submission = await Submission.findOne({
-      assignmentId,
-      problemId,
-      studentId
-    }).session(session);
-
-    if (submission) {
-      submission.answer = answer;
-      submission.submittedAt = now;
-      submission.graded = false;  // Reset graded status
-      submission.gradedBy = undefined;  // Clear grader reference
-      submission.gradedAt = undefined;  // Clear grading timestamp
-      submission.appliedRubricItems = [];  // Clear applied rubric items
-    } else {
-      // Create new submission
-      submission = new Submission({
-        assignmentId,
-        problemId,
-        studentId,
-        answer,
-        submittedAt: now,
-        graded: false,
-      });
-    }
-
-    await submission.save({ session });
-    await session.commitTransaction();
-    return submission;
-
+    // Save and return the new submission
+    return await newSubmission.save();
   } catch (error) {
-    await session.abortTransaction();
+    // Rethrow the error to be handled by the service layer
     throw error;
-  } finally {
-    session.endSession();
   }
-};
+}

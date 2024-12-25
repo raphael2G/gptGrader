@@ -16,6 +16,7 @@ export interface ISubmission {
   selfGrade?: number,
   selfGradingStatus?: 'pending' | 'completed';
   selfGradingCompletedAt?: Date;
+  // selfAssessedRubricItems? : string[] // list of refereneces to applied rubric ids // this is what the new model is going to be
   selfAssessedRubricItems?: {
     rubricItemId: string;
     comment?: string;

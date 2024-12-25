@@ -71,44 +71,6 @@ export const submissionApi = {
     }
   },
 
-  getStudentCourseStats: async (courseId: string, studentId: string): Promise<StudentStatsApiResponse> => {
-    await simulateApiDelay();
-    try {
-      const stats = await getStudentCourseStats(courseId, studentId);
-      return { data: stats };
-    } catch (err) {
-      return {
-        data: null,
-        error: { error: 'Failed to fetch student statistics' }
-      }
-    }
-  },
-
-  getStudentCompletionRate: async (courseId: string, studentId: string): Promise<{ data: number | null, error?: ApiError }> => {
-    await simulateApiDelay();
-    try {
-      const stats = await getStudentCourseStats(courseId, studentId);
-      return { data: stats ? stats.completionRate : null };
-    } catch (err) {
-      return {
-        data: null,
-        error: { error: 'Failed to fetch student completion rate' }
-      }
-    }
-  },
-
-  getStudentPointsEarnedRate: async (courseId: string, studentId: string): Promise<{ data: number | null, error?: ApiError }> => {
-    await simulateApiDelay();
-    try {
-      const stats = await getStudentCourseStats(courseId, studentId);
-      return { data: stats ? stats.pointsEarnedRate : null };
-    } catch (err) {
-      return {
-        data: null,
-        error: { error: 'Failed to fetch student points earned rate' }
-      }
-    }
-  },
   getSubmissionsByStudentAndCourse: async (studentId: string, courseId: string): Promise<SubmissionsApiResponse> => {
     await simulateApiDelay();
     try {
@@ -121,6 +83,7 @@ export const submissionApi = {
       }
     }
   },
+
   getSubmissionByAssignmentAndStudent: async (assignmentId: string, studentId: string): Promise<SubmissionApiResponse> => {
     await simulateApiDelay();
     try {
@@ -131,6 +94,7 @@ export const submissionApi = {
       return { data: null, error: { error: 'Failed to fetch submissions' } };
     }
   },
+
   getSubmissionByAssignmentProblemAndStudent: async (assignmentId: string, problemId: string, studentId: string): Promise<SubmissionApiResponse> => {
     await simulateApiDelay();
     try {
@@ -147,6 +111,7 @@ export const submissionApi = {
       };
     }
   },
+
   getSubmissionsByAssignmentId: async (assignmentId: string): Promise<SubmissionsApiResponse> => {
     await simulateApiDelay();
     try {
@@ -159,6 +124,7 @@ export const submissionApi = {
       }
     }
   },
+
   getSubmissionsByProblemId: async (problemId: string): Promise<SubmissionsApiResponse> => {
     await simulateApiDelay();
     try {
@@ -184,6 +150,7 @@ export const submissionApi = {
       };
     }
   },
+
   updateSubmission: async (submissionId: string, updateData: Partial<ISubmission>): Promise<SubmissionApiResponse> => {
     await simulateApiDelay();
     try {
@@ -226,7 +193,46 @@ export const submissionApi = {
         error: { error: 'Failed to fetch submissions for assignment and student' }
       };
     }
-  }
+  }, 
+
+  getStudentCourseStats: async (courseId: string, studentId: string): Promise<StudentStatsApiResponse> => {
+    await simulateApiDelay();
+    try {
+      const stats = await getStudentCourseStats(courseId, studentId);
+      return { data: stats };
+    } catch (err) {
+      return {
+        data: null,
+        error: { error: 'Failed to fetch student statistics' }
+      }
+    }
+  },
+
+  getStudentCompletionRate: async (courseId: string, studentId: string): Promise<{ data: number | null, error?: ApiError }> => {
+    await simulateApiDelay();
+    try {
+      const stats = await getStudentCourseStats(courseId, studentId);
+      return { data: stats ? stats.completionRate : null };
+    } catch (err) {
+      return {
+        data: null,
+        error: { error: 'Failed to fetch student completion rate' }
+      }
+    }
+  },
+
+  getStudentPointsEarnedRate: async (courseId: string, studentId: string): Promise<{ data: number | null, error?: ApiError }> => {
+    await simulateApiDelay();
+    try {
+      const stats = await getStudentCourseStats(courseId, studentId);
+      return { data: stats ? stats.pointsEarnedRate : null };
+    } catch (err) {
+      return {
+        data: null,
+        error: { error: 'Failed to fetch student points earned rate' }
+      }
+    }
+  },
 }
 
 export default submissionApi;

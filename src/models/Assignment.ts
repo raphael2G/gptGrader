@@ -14,8 +14,8 @@ export type IProblem = {
   rubric: {
     items: IRubricItem[];
   }
-  rubricFinalized?: boolean;
-  referenceSolution?: string;
+  rubricFinalized: boolean;
+  referenceSolution: string;
 }
 
 export type IAssignment = {
@@ -25,10 +25,9 @@ export type IAssignment = {
   description: string;
   dueDate: Date;
   lateDueDate: Date;
-  status: 'unreleased' | 'released' | 'closed' | 'graded';
-  totalPoints: number;
   problems: IProblem[];
-  gradingStatus?: "Not Started" | "In Progress" | "Finsihed"
+  isPublished: boolean;
+  areGradesReleased: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -45,8 +44,8 @@ const problemSchema = new Schema<IProblem>({
   rubric: {
     items: [rubricItemSchema]
   }, 
-  rubricFinalized: { type: Boolean }, 
-  referenceSolution: { type: String }
+  rubricFinalized: { type: Boolean, default: false }, 
+  referenceSolution: { type: String, default: ''}
 });
 
 const assignmentSchema = new Schema<IAssignment>({
@@ -55,20 +54,9 @@ const assignmentSchema = new Schema<IAssignment>({
   description: { type: String, required: true },
   dueDate: { type: Date, required: true },
   lateDueDate: { type: Date, required: true },
-  status: { 
-    type: String, 
-    enum: ['unreleased', 'released', 'closed', 'graded'],
-    default: 'unreleased',
-    required: true
-  },
-  totalPoints: { type: Number, required: true },
   problems: [problemSchema],
-  gradingStatus: {
-    type: String, 
-    enum: ["Not Started", "In Progress", "Finished"], 
-    default: 'Not Started',
-    required: false
-  }
+  isPublished: { type: Boolean, required: true, default: false}, 
+  areGradesReleased: { type: Boolean, required: true, default: false}, 
 }, {
   timestamps: true
 });
