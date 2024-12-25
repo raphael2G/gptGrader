@@ -97,5 +97,6 @@ export default function CoursePage({ params }: { params: { courseId: string } })
         )}
       </div>
     </div>
-  );
+  )
 }
+

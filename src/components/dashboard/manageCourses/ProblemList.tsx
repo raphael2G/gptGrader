@@ -1,10 +1,8 @@
-import { useEffect, useState } from "react"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Plus } from 'lucide-react'
 import { IProblem } from '@@/models/Assignment'
 import ProblemCard from '@/components/dashboard/manageCourses/ProblemCard'
-import { assignmentApi } from '@/api-client/endpoints/assignments'
 
 interface ProblemListProps {
   problems: IProblem[];
@@ -22,15 +20,16 @@ export function ProblemList({ problems, onEditProblem, onUpdateProblem, onAddPro
       </CardHeader>
       <CardContent className="space-y-4">
         {problems.map((problem, index) => (
-          <ProblemCard
-            key={problem._id?.toString()} 
-            problem={problem}
+          <ProblemCard 
+            key={problem.id} 
+            problem={problem} 
             index={index}
-            onUpdateProblem={handleUpdateProblem}
-            onDeleteProblem={() => handleDeleteProblem(problem._id!.toString())}
+            onEdit={() => onEditProblem(problem)}
+            onUpdateProblem={onUpdateProblem}
+            onDeleteProblem={onDeleteProblem}
           />
         ))}
-        <Button onClick={handleAddProblem} className="w-full">
+        <Button onClick={onAddProblem} className="w-full">
           <Plus className="h-4 w-4 mr-2" />
           Add Problem
         </Button>
@@ -38,3 +37,4 @@ export function ProblemList({ problems, onEditProblem, onUpdateProblem, onAddPro
     </Card>
   )
 }
+

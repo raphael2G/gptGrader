@@ -22,11 +22,8 @@ import {
 interface AssignmentDetailsProps {
   assignment: IAssignment
   editedAssignment: IAssignment
-  assignment: IAssignment
-  editedAssignment: IAssignment
   isEditDialogOpen: boolean
   setIsEditDialogOpen: (isOpen: boolean) => void
-  setEditedAssignment: (assignment: IAssignment) => void
   setEditedAssignment: (assignment: IAssignment) => void
   handleUpdateAssignment: () => void
   handleStatusChange: () => void
@@ -54,6 +51,8 @@ export function AssignmentDetails({
   setIsEditDialogOpen,
   setEditedAssignment,
   handleUpdateAssignment,
+  handleStatusChange,
+  problems
 }: AssignmentDetailsProps) {
   const { toast } = useToast()
   const [validationError, setValidationError] = useState<string | null>(null)
@@ -73,14 +72,12 @@ export function AssignmentDetails({
 
   const validateAndUpdate = () => {
     const dueDate = new Date(editedAssignment.dueDate)
-    const lateDeadline = new Date(editedAssignment.lateDueDate)
+    const lateDeadline = new Date(editedAssignment.finalSubmissionDeadline)
 
     if (lateDeadline < dueDate) {
       setValidationError("Late due date cannot be before the due date.")
-      setValidationError("Late due date cannot be before the due date.")
       toast({
         title: "Validation Error",
-        description: "Late due date cannot be before the due date.",
         description: "Late due date cannot be before the due date.",
         variant: "destructive",
       })
