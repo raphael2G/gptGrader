@@ -16,6 +16,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { UserAuth } from '@/contexts/AuthContext'
+import { courseApi } from '@/api-client/endpoints/courses'
+import { userApi } from '@/api-client/endpoints/users'
+import { ICourse } from '@/models/Course'
 
 export default function Home() {
   const [courseCode, setCourseCode] = useState('')
@@ -120,7 +124,13 @@ export default function Home() {
                   required
                 />
               </div>
-              <Button type="submit" className="w-full">Join Course</Button>
+              <Button 
+                type="submit" 
+                className="w-full"
+                disabled={isJoining}
+              >
+                {isJoining ? 'Joining...' : 'Join Course'}
+              </Button>
             </form>
             <Button
               variant="ghost"
@@ -136,7 +146,7 @@ export default function Home() {
       
       <div className="space-y-6">
         <h2 className="text-2xl font-semibold">Enrolled Courses</h2>
-        {enrolledCourses && enrolledCourses.length > 0 ? (
+        {enrolledCourses.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {enrolledCourses.map((course) => (
               <CourseCard
@@ -144,7 +154,7 @@ export default function Home() {
                 id={course._id}
                 title={course.title}
                 description={course.description}
-                assignmentCount={course.assignments.length}
+                assignmentCount={course.assignments?.length || 0}
               />
             ))}
           </div>

@@ -3,6 +3,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster"
 import { AuthContextProvider } from '@/contexts/AuthContext'
 import { Inter } from 'next/font/google'
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 
 
@@ -21,6 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html className="" lang="en" >
+      <SpeedInsights/>
       <body className={inter.className}>
         <AuthContextProvider> 
           {children}

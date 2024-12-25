@@ -1,19 +1,35 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { RubricItem } from '@/lib/dummy/courses'
 import { Checkbox } from "@/components/ui/checkbox"
 import { cn } from "@/lib/utils"
+import { assignmentApi } from '@/api-client/endpoints/assignments'
+import { IRubricItem } from '@/models/Assignment'
 
 interface RubricSidebarProps {
-  rubric: RubricItem[];
+  assignmentId: string;
+  problemId: string;
   isVisible: boolean;
   maxPoints: number;
 }
 
-export function RubricSidebar({ rubric, isVisible, maxPoints }: RubricSidebarProps) {
+export function RubricSidebar({ assignmentId, problemId, isVisible, maxPoints }: RubricSidebarProps) {
+  const [rubric, setRubric] = useState<IRubricItem[]>([])
   const [checkedItems, setCheckedItems] = useState<Record<number, boolean>>({})
   const [totalPoints, setTotalPoints] = useState(0)
+
+  useEffect(() => {
+    const fetchRubric = async () => {
+      const { data, error } = await assignmentApi.getAssignmentById(assignmentId)
+      if (error) {
+        console.error('Failed to fetch rubric:', error)
+        return
+      }
+      const problem = data!.problems.find(p => p._id?.toString() === problemId)
+      setRubric(problem?.rubric?.items || [])
+    }
+    fetchRubric()
+  }, [assignmentId, problemId])
 
   useEffect(() => {
     const newTotal = rubric.reduce((sum, item, index) => {

@@ -3,7 +3,6 @@ import { useContext, createContext, useState, useEffect } from "react";
 import { signInWithPopup, signOut, onAuthStateChanged, GoogleAuthProvider } from "@firebase/auth";
 import { FireAuth } from "@/firebase/firebase";
 
-
 interface AuthContext {
   user: any;
   googleSignIn: () => void;
@@ -22,8 +21,6 @@ export const UserAuth = () => {
   return useContext(AuthContext);
 };
 
-
-
 export const AuthContextProvider = ({ children }: any) => {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -37,29 +34,36 @@ export const AuthContextProvider = ({ children }: any) => {
     signOut(FireAuth);
   };
 
+  // Function to get MongoDB _id from Firebase UID
+  const fetchMongoId = async (firebaseUid: string) => {
+    try {
+      const response = await fetch(`/api/users/lookup?firebaseUid=${firebaseUid}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch user');
+      }
+
+      const data = await response.json();
+      return data.data._id;
+    } catch (error) {
+      console.error('Error fetching MongoDB _id:', error);
+      return null;
+    }
+  };
+  
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(FireAuth, (currentUser) => {
-      console.log(currentUser);
+    const unsubscribe = onAuthStateChanged(FireAuth, async (currentUser) => {
       if (currentUser) {
-        console.log("User is logged in");
-        setUser(currentUser);
+        setLoading(true);
+        const mongoId = await fetchMongoId(currentUser.uid)
+        setUser({...currentUser, _id: mongoId});
       } else {
         setUser(null);
       }
-
       setLoading(false);
     });
     return () => unsubscribe();
-
-
-  }, [user]);
-
-
-
-  const isUserLoggedIn = () => {
-    return user !== null;
-  }
-
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, googleSignIn, logOut, loading }}>
