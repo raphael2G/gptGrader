@@ -65,3 +65,23 @@ manage-courses/course1/grading/assignment1/problem2/setup
 23. toast is broken in some places
 
 24. i think some of hte discrepancy issues are because of the api, which means we will fix that once we swap over the api
+
+25. manage assignments needs to also be able to add refsol. or maybe consider just making it a question only thing
+
+26. rubric in the calibration section is unclickeable. that way only the AI can grade it, and then to change it you have to give feedback for why
+
+27. Need to make some sort of UI for updating the rubric item text based on the feedback it just got
+
+28. move the toast for submiting discrepancy reports (top right makes most sense)
+
+29. Need to add "grading multiplier" for discrepancy reports. need to be able to mark if it was an "adequate effort" or not. Also the UI is not very clear right now. issues with the icons showing up. 
+
+30. add a hover over each rubric item which explains who applied the rubric item and who did not
+
+31. add question mark on combined rubric section which explains what the view shows you (student grading on left, staff grading on right. different rubric colors on each side show that...)
+
+32. change url to give the course id
+- make get course by courseId 
+
+33. change url to give the assignment name
+- make get assignment by courseId and assignment name
