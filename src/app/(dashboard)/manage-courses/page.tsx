@@ -4,15 +4,6 @@ import { useState, useEffect, ReactNode } from 'react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card"
-import { ICourse } from '@/models/Course'
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-
 import {
   Dialog,
   DialogContent,
@@ -50,24 +41,6 @@ return (
     </Card>
   </Link>
 )
-}
-
-interface CourseFormData {
-  title: string;
-  courseCode: string;
-  description: string;
-  instructor: string;
-  semester?: string;
-  year?: number;
-}
-
-const initialFormData: CourseFormData = {
-  title: '',
-  courseCode: '',
-  description: '',
-  instructor: '',
-  semester: undefined,
-  year: undefined,
 }
 
 export default function ManageCoursesPage() {
@@ -233,35 +206,6 @@ export default function ManageCoursesPage() {
                   onChange={(e) => setNewCourse({ ...newCourse, instructor: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Semester</Label>
-                <Select
-                  value={newCourse.semester}
-                  onValueChange={(value) => setNewCourse({ ...newCourse, semester: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select semester" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Fall">Fall</SelectItem>
-                    <SelectItem value="Spring">Spring</SelectItem>
-                    <SelectItem value="Summer">Summer</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="year">Year</Label>
-                <Input
-                  id="year"
-                  type="number"
-                  placeholder="e.g., 2024"
-                  value={newCourse.year || ''}
-                  onChange={(e) => setNewCourse({ 
-                    ...newCourse, 
-                    year: e.target.value ? parseInt(e.target.value) : undefined 
-                  })}
-                />
-              </div>
             </div>
             <Button onClick={handleAddCourse}>Add Course</Button>
           </DialogContent>
@@ -269,7 +213,7 @@ export default function ManageCoursesPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {courses?.map((course) => (
+        {courses.map((course) => (
           <InstructorCourseCard
             key={course._id}
             course={course}

@@ -193,3 +193,4 @@ export default function AssignmentsPage({ params }: { params: { courseId: string
     </div>
   )
 }
+

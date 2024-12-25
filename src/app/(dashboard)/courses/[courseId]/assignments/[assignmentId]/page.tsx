@@ -69,7 +69,6 @@ export default function AssignmentPage({ params }: { params: { courseId: string,
 
   if (!assignment) {
     return notFound()
-    return notFound()
   }
 
   const getAssignmentStatus = (assignment: IAssignment, submissions: ISubmission[]) => {
@@ -144,3 +143,4 @@ export default function AssignmentPage({ params }: { params: { courseId: string,
     </div>
   )
 }
+

@@ -2,37 +2,6 @@
 
 This documentation outlines the file structure for a Next.js API that handles course management functionality. The API is organized using Next.js route handlers, following RESTful conventions.
 
-# Client APIs
-
-below is not a file tree. it just stores all of the functions in the api
-```
-api-client/
-└── users/
-│   └── create
-│   └── getEnrolledCourses  
-│   └── getInstructingCourses
-│
-└── courses/
-│   └── getCourseById
-│   └── createCourse
-│   └── delete
-│   └── addStudent
-│   └── joinCourseByCode
-│ 
-└── assignments/
-│   └── getAssignmentById
-│   └── create
-│   └── update
-│   └── delete
-│   └── upsertProblem
-│   └── deleteProblem
-│   └── upsertRubricItem
-│   └── deleteRubricItem
-│
-└── submissions/
-    └── (no functions implemented yet)
-```
-
 ## File Structure
 Notice that we have two folders. One stores the actual API routes, while the other stores client function to interact with them, abstracting annoying implementation details.
 ```

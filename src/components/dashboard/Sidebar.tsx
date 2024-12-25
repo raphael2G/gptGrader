@@ -6,7 +6,7 @@ import { useTheme } from 'next-themes'
 import { Book, User, Settings, ChevronRight, ChevronLeft, Sun, Moon, Briefcase } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-
+import { isUserInstructor } from '@/hooks/user-status'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,8 +14,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useSidebar } from '@/contexts/SidebarContext'
-import { UserAuth } from '@/contexts/AuthContext'
-import { userApi } from '@/api-client/endpoints/users'
 
 const SidebarItem = ({ icon: Icon, label, href, isCollapsed }: { icon: any, label: string, href: string, isCollapsed: boolean }) => (
   <Link href={href} className="flex items-center p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-300 ease-in-out">
@@ -32,33 +30,10 @@ export function Sidebar() {
   const { isCollapsed, setIsCollapsed } = useSidebar()
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
-  const { user } = UserAuth();
-  const [isUserInstructor, setIsUserInstructor] = useState<boolean>(false);
 
   useEffect(() => {
     setMounted(true)
   }, [])
-
-  useEffect(() => {
-    const determineIsUserInstructor = async () => {
-      if (!user?._id) return;
-  
-      try {
-        const { data: instructingCourses, error } = await userApi.getInstructingCourses(user._id);
-        console.log(instructingCourses)
-        if (error) {
-          console.error("Failed to fetch instructing courses:", error);
-          return; 
-        }
-  
-        setIsUserInstructor(Array.isArray(instructingCourses) && instructingCourses.length > 0);
-      } catch (err) {
-        console.error("An unexpected error occurred:", err);
-      }
-    };
-  
-    determineIsUserInstructor();
-  }, [user])
 
   if (!mounted) {
     return null
@@ -108,7 +83,7 @@ export function Sidebar() {
           </li>
 
 
-          {isUserInstructor && (<li>
+          {isUserInstructor() && (<li>
             <SidebarItem icon={Briefcase} label="Manage Courses" href="/manage-courses" isCollapsed={isCollapsed} />
           </li>)}
 

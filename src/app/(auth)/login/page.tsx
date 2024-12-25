@@ -1,5 +1,8 @@
 import { Metadata } from "next";
 import Image from "next/image";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
+import { buttonVariants } from "@/components/ui/button";
 import LoginForm from "@/components/auth/login/login";
 import EarthImage from '@/assets/earth.jpg'
 
@@ -58,6 +61,19 @@ export default function AuthenticationPage() {
                         />
                     </div>
 
+
+
+                    {/* This is responsible for the text appearing on the side
+                    <div className="relative z-20 mt-auto">
+                        <blockquote className="space-y-2">
+                            <p className="text-lg">
+                                &ldquo;This library has saved me countless hours of work and
+                                helped me deliver stunning designs to my clients faster than
+                                ever before.&rdquo;
+                            </p>
+                            <footer className="text-sm">- Kanye West</footer>
+                        </blockquote>
+                    </div> */}
                 </div>
 
 
