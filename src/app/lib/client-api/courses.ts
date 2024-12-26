@@ -25,6 +25,8 @@ interface DeleteCourseResponse {
 }
 
 export const courseApi = {
+
+  // do not need this, can get from users
   getInstructorCourses: async (): Promise<CoursesApiResponse> => {
     await simulateApiDelay();
     try {
@@ -89,6 +91,7 @@ export const courseApi = {
     }
   },
 
+
   updateCourse: async (courseId: string, updateData: Partial<ICourse>): Promise<CourseApiResponse> => {
     await simulateApiDelay();
     try {
@@ -107,6 +110,7 @@ export const courseApi = {
     }
   },
 
+
   deleteCourse: async (courseId: string): Promise<DeleteCourseResponse> => {
     await simulateApiDelay();
     try {
@@ -122,6 +126,7 @@ export const courseApi = {
     }
   },
 
+  // do not need this, we can get the ids 
   getStudentsInCourse: async (courseId: string): Promise<{ data: IUser[] | null, error?: ApiError }> => {
     await simulateApiDelay();
     try {
@@ -137,6 +142,7 @@ export const courseApi = {
     }
   },
 
+  // returns all students in a course
   getStudentIdsInCourse: async (courseId: string): Promise<{ data: string[] | null, error?: ApiError }> => {
     await simulateApiDelay();
     try {
@@ -153,6 +159,8 @@ export const courseApi = {
       }
     }
   },
+
+  // do not need below, in users
   getEnrolledCourses: async (userId: string): Promise<CoursesApiResponse> => {
     await simulateApiDelay();
     try {
@@ -166,6 +174,7 @@ export const courseApi = {
       };
     }
   },
+
   addStudent: async (courseId: string, studentId: string): Promise<CourseApiResponse> => {
     await simulateApiDelay();
     try {
