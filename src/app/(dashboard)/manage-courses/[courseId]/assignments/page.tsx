@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { BackButton } from '@/components/various/BackButton'
 import { assignmentApi } from '@/app/lib/client-api/assignments'
-import { IAssignment } from '@/app/models/Assignment'
+import { IAssignment } from '@/models/Assignment'
 import { Plus, Calendar } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from "@/components/ui/use-toast"
@@ -22,9 +22,15 @@ import {
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge" // Import Badge
 
+import { useGetCourseById } from '@/hooks/queries/useCourses'
+import { 
+  useGetAssignmentsByArrayOfIds, 
+  useCreateAssignment
+ } from '@/hooks/queries/useAssignments'
+
 function AssignmentCard({ assignment }: { assignment: IAssignment }) {
   return (
-    <Link href={`/manage-courses/${assignment.courseId}/assignments/${assignment._id}`}>
+    <Link href={`/manage-courses/${assignment.courseId.toString()}/assignments/${assignment._id.toString()}`}>
       <Card className="h-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
         <CardHeader>
           <div className="flex justify-between items-start w-full"> {/* Added flex and w-full */}
@@ -53,79 +59,122 @@ function AssignmentCard({ assignment }: { assignment: IAssignment }) {
 }
 
 export default function AssignmentsPage({ params }: { params: { courseId: string } }) {
-  const [assignments, setAssignments] = useState<IAssignment[]>([])
-  const [loading, setLoading] = useState(true)
+  // const [assignments, setAssignments] = useState<IAssignment[]>([])
+  // const [loading, setLoading] = useState(true)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [newAssignment, setNewAssignment] = useState<Partial<IAssignment>>({
     title: '',
     description: '',
     dueDate: new Date(),
-    finalSubmissionDeadline: new Date(),
+    lateDueDate: new Date(),
     problems: []
   })
   const router = useRouter()
   const { toast } = useToast()
 
-  useEffect(() => {
-    fetchAssignments()
-  }, [])
+  const {
+    data: course, 
+    isLoading: isGettingCourse, 
+    error: errorGettingCourse
+  } = useGetCourseById(params.courseId);
 
-  const fetchAssignments = async () => {
-    setLoading(true)
-    try {
-      const response = await assignmentApi.getAssignmentsByCourseId(params.courseId)
-      if (response.data) {
-        setAssignments(response.data)
-      } else {
-        throw new Error(response.error?.error || 'Failed to fetch assignments')
-      }
-    } catch (err) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch assignments. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
+  const {
+    assignments, 
+    isLoading: isGettingAssignments, 
+    error: errorGettingAssignments
+  } = useGetAssignmentsByArrayOfIds(course?.assignments.map(id => id.toString()) || [], {enabled: !!course && !isGettingCourse})
+
+  const { mutate: createAssignment, isPending: isCreatingAssignment } = useCreateAssignment();
+
+  if (isGettingCourse) return <div>Fetching course data...</div>
+  if (isGettingAssignments) return <div>Fetching assignments data...</div>
+  if (errorGettingCourse) {
+    toast({
+      title: "Something went wrong loading this course.",
+      description: errorGettingCourse?.message || "Please try again later",
+      variant: "destructive"
+    })
+    router.push("/manage-courses")
+    return <div>There was an issue getting your course. {errorGettingCourse?.message}</div>;
+  }
+  if (errorGettingAssignments) {
+    toast({
+      title: "Something went wrong getting the assignments for this course.",
+      description: errorGettingAssignments?.message || "Please try again later",
+      variant: "destructive"
+    })
+    router.push("/manage-courses")
+    return <div>There was an issue getting your assignments for this course. {errorGettingAssignments?.message}</div>;
   }
 
-  const handleAddAssignment = async () => {
-    try {
-      const response = await assignmentApi.createAssignment(params.courseId, newAssignment as IAssignment)
-      if (response.data) {
-        setAssignments([...assignments, response.data])
-        setIsAddDialogOpen(false)
+
+const handleAddAssignment = () => {
+  createAssignment(
+    {
+      courseId: params.courseId,
+      assignmentData: newAssignment as IAssignment
+    },
+    {
+      onSuccess: () => {
+        setIsAddDialogOpen(false);
         setNewAssignment({
           title: '',
           description: '',
           dueDate: new Date(),
-          finalSubmissionDeadline: new Date(),
+          lateDueDate: new Date(),
           problems: []
-        })
+        });
         toast({
           title: "Success",
           description: "Assignment added successfully.",
-        })
-      } else {
-        throw new Error(response.error?.error || 'Failed to add assignment')
+          variant: "success"
+        });
+      },
+      onError: (error) => {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to add assignment. Please try again.",
+          variant: "destructive",
+        });
       }
-    } catch (err) {
-      toast({
-        title: "Error",
-        description: "Failed to add assignment. Please try again.",
-        variant: "destructive",
-      })
     }
-  }
+  );
+};
 
-  if (loading) {
-    return <div>Loading assignments...</div>
-  }
+
+  // const handleAddAssignment = async () => {
+  //   try {
+  //     const response = await assignmentApi.createAssignment(params.courseId, newAssignment as IAssignment)
+  //     if (response.data) {
+  //       setAssignments([...assignments, response.data])
+  //       setIsAddDialogOpen(false)
+  //       setNewAssignment({
+  //         title: '',
+  //         description: '',
+  //         dueDate: new Date(),
+  //         finalSubmissionDeadline: new Date(),
+  //         problems: []
+  //       })
+  //       toast({
+  //         title: "Success",
+  //         description: "Assignment added successfully.",
+  //       })
+  //     } else {
+  //       throw new Error(response.error?.error || 'Failed to add assignment')
+  //     }
+  //   } catch (err) {
+  //     toast({
+  //       title: "Error",
+  //       description: "Failed to add assignment. Please try again.",
+  //       variant: "destructive",
+  //     })
+  //   }
+  // }
+
 
   return (
     <div className="space-y-6">
-      <BackButton />
+      <BackButton backLink={'/manage-courses'}/>
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Assignments</h1>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
@@ -171,8 +220,8 @@ export default function AssignmentsPage({ params }: { params: { courseId: string
                 <Input
                   id="assignment-final-deadline"
                   type="date"
-                  value={newAssignment.finalSubmissionDeadline?.toISOString().split('T')[0]}
-                  onChange={(e) => setNewAssignment({ ...newAssignment, finalSubmissionDeadline: new Date(e.target.value) })}
+                  value={newAssignment.lateDueDate?.toISOString().split('T')[0]}
+                  onChange={(e) => setNewAssignment({ ...newAssignment, lateDueDate: new Date(e.target.value) })}
                 />
               </div>
             </div>

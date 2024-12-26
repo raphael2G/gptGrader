@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { BackButton } from '@/components/various/BackButton'
 import { assignmentApi } from '@@/lib/client-api/assignments'
-import { IAssignment, IProblem } from '@@/models/Assignment'
 import { useToast } from "@/components/ui/use-toast"
 import { AssignmentDetails } from '@/components/dashboard/manageCourses/AssignmentDetails'
 import { ProblemList } from '@/components/dashboard/manageCourses/ProblemList'
@@ -19,42 +18,59 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 
+import { IAssignment, IProblem } from '@/models/Assignment'
+import { useGetAssignmentById } from '@/hooks/queries/useAssignments'
+
 export default function AssignmentDetailsPage({ params }: { params: { courseId: string, assignmentId: string } }) {
-  const [assignment, setAssignment] = useState<IAssignment | null>(null)
+  // const [assignment, setAssignment] = useState<IAssignment | null>(null)
   const [editedAssignment, setEditedAssignment] = useState<IAssignment | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editingProblem, setEditingProblem] = useState<IProblem | null>(null)
   const [isEditProblemDialogOpen, setIsEditProblemDialogOpen] = useState(false)
-  const [loading, setLoading] = useState(true)
+  // const [loading, setLoading] = useState(true)
   
   const router = useRouter()
   const { toast } = useToast()
 
-  useEffect(() => {
-    fetchAssignment()
-  }, [params.assignmentId])
+  const {data: assignment, isLoading: isGettingAssignment, error: errorGettingAssignment} = useGetAssignmentById(params.assignmentId)
 
-  const fetchAssignment = async () => {
-    setLoading(true)
-    try {
-      const response = await assignmentApi.getAssignmentById(params.assignmentId)
-      if (response.data) {
-        setAssignment(response.data)
-        setEditedAssignment(response.data)
-      } else {
-        throw new Error(response.error?.error || 'Failed to fetch assignment')
-      }
-    } catch (err) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch assignment details.",
-        variant: "destructive",
-      })
-      router.push(`/manage-courses/${params.courseId}/assignments`)
-    } finally {
-      setLoading(false)
-    }
+  // useEffect(() => {
+  //   fetchAssignment()
+  // }, [params.assignmentId])
+
+  // const fetchAssignment = async () => {
+  //   setLoading(true)
+  //   try {
+  //     const response = await assignmentApi.getAssignmentById(params.assignmentId)
+  //     if (response.data) {
+  //       setAssignment(response.data)
+  //       setEditedAssignment(response.data)
+  //     } else {
+  //       throw new Error(response.error?.error || 'Failed to fetch assignment')
+  //     }
+  //   } catch (err) {
+  //     toast({
+  //       title: "Error",
+  //       description: "Failed to fetch assignment details.",
+  //       variant: "destructive",
+  //     })
+  //     router.push(`/manage-courses/${params.courseId}/assignments`)
+  //   } finally {
+  //     setLoading(false)
+  //   }
+  // }
+
+  if (isGettingAssignment) return <div>Fetching the assignment...</div>
+  if (errorGettingAssignment) {
+    toast({
+      title: "Something went wrong getting this assignment.",
+      description: errorGettingAssignment?.message || "Please try again later",
+      variant: "destructive"
+    })
+    router.push("/manage-courses/{params.courseId}/assignments")
+    return <div>There was an issue getting your course. {errorGettingAssignment?.message}</div>;
   }
+
 
   const handleUpdateAssignment = async () => {
     if (!assignment || !editedAssignment) return

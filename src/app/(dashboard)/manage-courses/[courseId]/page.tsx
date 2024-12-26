@@ -1,52 +1,30 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { BackButton } from '@/components/various/BackButton'
-import { courseApi } from '@/app/lib/client-api/courses'
-import { ICourse } from '@/app/models/Course'
+
 import Link from 'next/link'
 import { BookOpen, Users, GraduationCap, FileWarning } from 'lucide-react'
-import { useToast } from "@/components/ui/use-toast"
+
+import { useGetCourseById } from '@/hooks/queries/useCourses'
+import { useToast } from '@/components/ui/use-toast'
 
 export default function CourseManagementPage({ params }: { params: { courseId: string } }) {
-  const [course, setCourse] = useState<ICourse | null>(null)
-  const [loading, setLoading] = useState(true)
   const router = useRouter()
-  const { toast } = useToast()
+  const { toast } = useToast();
+  const {data: course, isLoading: isGettingCourse, error: errorGettingCourse} = useGetCourseById(params.courseId)
 
-  useEffect(() => {
-    const fetchCourse = async () => {
-      setLoading(true)
-      try {
-        const response = await courseApi.getCourseById(params.courseId)
-        if (response.data) {
-          setCourse(response.data)
-        } else {
-          throw new Error(response.error?.error || 'Failed to fetch course')
-        }
-      } catch (err) {
-        toast({
-          title: "Error",
-          description: "Failed to fetch course details. Redirecting to manage courses page.",
-          variant: "destructive",
-        })
-        router.push('/manage-courses')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchCourse()
-  }, [params.courseId, router, toast])
-
-  if (loading) {
-    return <div>Loading...</div>
-  }
-
-  if (!course) {
-    return <div>Course not found</div>
+  if (isGettingCourse ) return <div>Fetching course details...</div>
+  if (!course) return <div>Unable to find course</div>
+  if (errorGettingCourse) {
+    toast({
+      title: "Something went wrong loading this course.",
+      description: errorGettingCourse?.message || "Please try again later",
+      variant: "destructive"
+    })
+    router.push("/manage-courses")
+    return <div>There was an issue getting your course. {errorGettingCourse?.message}</div>;
   }
 
   return (
@@ -59,7 +37,7 @@ export default function CourseManagementPage({ params }: { params: { courseId: s
           <CardTitle>Course Details</CardTitle>
         </CardHeader>
         <CardContent>
-          <p><strong>Course ID:</strong> {course._id}</p>
+          <p><strong>Course Code:</strong> {course.courseCode}</p>
           <p><strong>Title:</strong> {course.title}</p>
           <p><strong>Description:</strong> {course.description}</p>
           <p><strong>Instructor:</strong> {course.instructor}</p>

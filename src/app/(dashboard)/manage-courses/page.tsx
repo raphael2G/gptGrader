@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, ReactNode } from 'react'
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card"
+import { useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+
 import {
   Dialog,
   DialogContent,
@@ -12,12 +12,18 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import { BookOpen } from 'lucide-react'
 import { Label } from "@/components/ui/label"
-import { courseApi } from '@@/lib/client-api/courses'
-import { ICourse } from '@@/models/Course'
-import { Pencil, Trash2, BookOpen } from 'lucide-react'
-import Link from 'next/link'
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from '@/components/ui/use-toast'
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+
+import { ICourse } from '@/models/Course'
+
+import { useInstructingCourses } from '@/hooks/queries/useUsers'
+import { useCreateCourse } from "@/hooks/queries/useCourses"
+import { UserAuth } from '@/contexts/AuthContext'
 
 
 function InstructorCourseCard({ course }: { course: ICourse }) {
@@ -44,116 +50,51 @@ return (
 }
 
 export default function ManageCoursesPage() {
-  const [courses, setCourses] = useState<ICourse[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [newCourse, setNewCourse] = useState({ title: '', courseCode: '', description: '', instructor: '' })
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [editingCourse, setEditingCourse] = useState<ICourse | null>(null)
   const { toast } = useToast()
+  const router = useRouter()
 
-  useEffect(() => {
-    fetchCourses()
-  }, [])
+  const user = UserAuth().user
+  const {data: courses = [], isLoading, error} = useInstructingCourses(user?._id.toString() || '', {enabled: !!user?._id.toString()});
+  const {mutate: createCourse, isPending: creatingCourse, error: errorCreatingCourse} = useCreateCourse();
 
-  const fetchCourses = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const response = await courseApi.getInstructorCourses()
-      if (response.data) {
-        setCourses(response.data)
-      } else {
-        throw new Error(response.error?.error || 'Failed to fetch courses')
-      }
-    } catch (err) {
-      setError('Failed to fetch courses')
-      toast({
-        title: "Error",
-        description: "Failed to fetch courses. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
+  if (isLoading) {return <div>Loading...</div>}
+  if (errorCreatingCourse) {
+    toast({
+      title: "Something went wrong loading this course.",
+      description: errorCreatingCourse?.message || "Please try again later",
+      variant: "destructive"
+    })
+    router.push("/manage-courses")
+    return <div>There was an issue getting your course. {errorCreatingCourse?.message}</div>;
   }
 
-  const handleAddCourse = async () => {
+  const handleCreateCourse = async () => {
     if (newCourse.title && newCourse.courseCode) {
-      try {
-        const response = await courseApi.createCourse(newCourse, '69') // Using '69' as the instructor ID
-        if (response.data) {
-          setCourses([...courses, response.data])
-          setNewCourse({ title: '', courseCode: '', description: '', instructor: '' })
-          setIsAddDialogOpen(false)
-          toast({
-            title: "Success",
-            description: "Course added successfully.",
-          })
-        } else {
-          throw new Error(response.error?.error || 'Failed to add course')
+      createCourse(
+        {courseData: newCourse, creatorId: user?._id.toString() || ''},
+        {
+          onSuccess: () => {
+            setNewCourse({ title: '', courseCode: '', description: '', instructor: '' })
+            setIsAddDialogOpen(false)
+            toast({
+              title: "Success",
+              description: "Course added successfully.",
+              variant: "success"
+            })
+          },
+
+          onError: (error) => {
+            toast({
+              title: "Error",
+              description: error.message || "Failed to add course. Please try again.",
+              variant: "destructive",
+            })
+          }
         }
-      } catch (err) {
-        toast({
-          title: "Error",
-          description: "Failed to add course. Please try again.",
-          variant: "destructive",
-        })
-      }
+      )
     }
-  }
-
-  const handleUpdateCourse = async () => {
-    if (editingCourse) {
-      try {
-        const response = await courseApi.updateCourse(editingCourse._id, editingCourse)
-        if (response.data) {
-          setCourses(courses.map(course => course._id === editingCourse._id ? response.data : course))
-          setEditingCourse(null)
-          toast({
-            title: "Success",
-            description: "Course updated successfully.",
-          })
-        } else {
-          throw new Error(response.error?.error || 'Failed to update course')
-        }
-      } catch (err) {
-        toast({
-          title: "Error",
-          description: "Failed to update course. Please try again.",
-          variant: "destructive",
-        })
-      }
-    }
-  }
-
-  const handleDeleteCourse = async (courseId: string) => {
-    try {
-      const response = await courseApi.deleteCourse(courseId)
-      if (response.success) {
-        setCourses(courses.filter(course => course._id !== courseId))
-        toast({
-          title: "Success",
-          description: "Course deleted successfully.",
-        })
-      } else {
-        throw new Error(response.error || 'Failed to delete course')
-      }
-    } catch (err) {
-      toast({
-        title: "Error",
-        description: "Failed to delete course. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  if (loading) {
-    return <div>Loading courses...</div>
-  }
-
-  if (error) {
-    return <div>Error: {error}</div>
   }
 
   return (
@@ -207,7 +148,7 @@ export default function ManageCoursesPage() {
                 />
               </div>
             </div>
-            <Button onClick={handleAddCourse}>Add Course</Button>
+            <Button onClick={handleCreateCourse} disabled={creatingCourse}>{creatingCourse ? "Creating Coure..." : "Add Course"}</Button>
           </DialogContent>
         </Dialog>
       </div>
@@ -215,49 +156,13 @@ export default function ManageCoursesPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {courses.map((course) => (
           <InstructorCourseCard
-            key={course._id}
+            key={course._id?.toString() || course.title}
             course={course}
           />
         ))}
       </div>
 
-      {editingCourse && (
-        <Dialog open={!!editingCourse} onOpenChange={(open) => !open && setEditingCourse(null)}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Edit Course</DialogTitle>
-              <DialogDescription>Update the details for this course.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-course-title">Course Title</Label>
-                <Input
-                  id="edit-course-title"
-                  value={editingCourse.title}
-                  onChange={(e) => setEditingCourse({ ...editingCourse, title: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-course-description">Course Description</Label>
-                <Input
-                  id="edit-course-description"
-                  value={editingCourse.description}
-                  onChange={(e) => setEditingCourse({ ...editingCourse, description: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-instructor-name">Instructor Name</Label>
-                <Input
-                  id="edit-instructor-name"
-                  value={editingCourse.instructor}
-                  onChange={(e) => setEditingCourse({ ...editingCourse, instructor: e.target.value })}
-                />
-              </div>
-            </div>
-            <Button onClick={handleUpdateCourse}>Update Course</Button>
-          </DialogContent>
-        </Dialog>
-      )}
+
     </div>
   )
 }
