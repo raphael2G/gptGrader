@@ -3,8 +3,8 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster"
 import { AuthContextProvider } from '@/contexts/AuthContext'
 import { Inter } from 'next/font/google'
-
-
+import { ReactQueryProvider } from '@/contexts/ReactQueryProvider'
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -22,10 +22,13 @@ export default function RootLayout({
   return (
     <html className="" lang="en" >
       <body className={inter.className}>
-        <AuthContextProvider> 
-          {children}
-          <Toaster />
-        </AuthContextProvider>
+        <ReactQueryProvider>
+          <AuthContextProvider> 
+            {children}
+            <Toaster />
+            <ReactQueryDevtools/>
+          </AuthContextProvider>
+        </ReactQueryProvider>
       </body>
     </html>
   );
