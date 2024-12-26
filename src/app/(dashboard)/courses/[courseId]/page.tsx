@@ -11,48 +11,26 @@ import { useToast } from "@/components/ui/use-toast"
 import { Loader2 } from 'lucide-react'
 import { IAssignment } from '@/app/models/Assignment'
 import { EmptyState } from '@/components/various/EmptyState';
+import { useGetCourseById } from '@/hooks/queries/useCourses'
+import { useGetAssignmentsByArrayOfIds } from "@/hooks/queries/useAssignments"
 
 export default function CoursePage({ params }: { params: { courseId: string } }) {
-  const [course, setCourse] = useState<ICourse | null>(null)
-  const [assignments, setAssignments] = useState<IAssignment[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // const [course, setCourse] = useState<ICourse | null>(null)
+  // const [assignments, setAssignments] = useState<IAssignment[]>([])
+  // const [loading, setLoading] = useState(true)
+  // const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const { toast } = useToast()
 
-  useEffect(() => {
-    const fetchCourseData = async () => {
-      setLoading(true);
-      try {
-        const courseResponse = await courseApi.getCourseById(params.courseId);
-        if (!courseResponse.data) {
-          throw new Error(courseResponse.error?.error || 'Course not found');
-        }
-        setCourse(courseResponse.data);
+  const {data: course, isLoading: isLoadingCourse, error: fetchingCourseError} = useGetCourseById(params.courseId);
+  const {
+    assignments, 
+    isLoading: isLoadingAssignments, 
+    error: fetchingAssignmentsError
+  } = useGetAssignmentsByArrayOfIds(course?.assignments.map(item => {return item.toString()}) || [], {enabled: !!course})
 
-        const assignmentsResponse = await assignmentApi.getAssignmentsByCourseId(params.courseId);
-        if (assignmentsResponse.data) {
-          setAssignments(assignmentsResponse.data);
-        } else {
-          throw new Error(assignmentsResponse?.error?.error || 'Failed to fetch assignments');
-        }
 
-      } catch (err: any) {
-        setError(err.message);
-        toast({
-          title: "Error",
-          description: err.message,
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCourseData();
-  }, [params.courseId, router, toast]);
-
-  if (loading) {
+  if (isLoadingAssignments || isLoadingCourse) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -60,15 +38,27 @@ export default function CoursePage({ params }: { params: { courseId: string } })
     )
   }
 
-  if (error || !course) {
+  if (fetchingCourseError || !course) {
     return (
       <div className="text-center">
         <h1 className="text-2xl font-bold text-red-500 mb-4">Error</h1>
-        <p className="text-lg text-gray-600 dark:text-gray-400">{error || 'Course not found'}</p>
+        <p className="text-lg text-gray-600 dark:text-gray-400">{fetchingCourseError?.message || 'There was an issue fetching your course...'}</p>
         <BackButton />
       </div>
     )
   }
+
+  if (fetchingAssignmentsError) {
+    return (
+      <div className="text-center">
+        <h1 className="text-2xl font-bold text-red-500 mb-4">Error</h1>
+        <p className="text-lg text-gray-600 dark:text-gray-400">{fetchingAssignmentsError?.message || 'There was an issue fetching your assignments...'}</p>
+        <BackButton />
+      </div>
+    )
+  }
+
+
 
   return (
     <div className="space-y-6">
@@ -86,9 +76,9 @@ export default function CoursePage({ params }: { params: { courseId: string } })
               .filter((assignment) => assignment.isPublished) // Filter out unpublished assignments
               .map((assignment) => (
                 <AssignmentCard
-                  key={assignment._id}
-                  courseId={course._id}
-                  assignmentId={assignment._id}
+                  key={assignment._id.toString()}
+                  courseId={course._id.toString()}
+                  assignmentId={assignment._id.toString()}
                 />
               ))}
           </div>
