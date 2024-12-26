@@ -1,13 +1,13 @@
 import mongoose, { Schema, Types } from 'mongoose';
 
 export type IRubricItem = {
-  _id?: mongoose.Types.ObjectId;
+  _id: mongoose.Types.ObjectId;
   description: string;
   points: number;
 }
 
 export type IProblem = {
-  _id?: Types.ObjectId;  // Optional for new problems, present for existing ones
+  _id: Types.ObjectId;  // Optional for new problems, present for existing ones
   question: string;
   maxPoints: number;
   orderIndex: number;
@@ -19,7 +19,7 @@ export type IProblem = {
 }
 
 export type IAssignment = {
-  _id?: mongoose.Types.ObjectId;
+  _id: mongoose.Types.ObjectId;
   courseId: mongoose.Types.ObjectId;
   title: string;
   description: string;

@@ -2,7 +2,7 @@
 import mongoose, { Schema } from 'mongoose';
 
 export type IUser = {
-  _id?: mongoose.Types.ObjectId;
+  _id: mongoose.Types.ObjectId;
   firebaseUid: string;
   email: string;
   name?: string;

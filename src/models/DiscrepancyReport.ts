@@ -1,7 +1,7 @@
 import mongoose, { Schema } from 'mongoose';
 
 export type IDiscrepancyItem = {
-  _id?: mongoose.Types.ObjectId;
+  _id: mongoose.Types.ObjectId;
   submissionId: mongoose.Types.ObjectId;
   studentId: mongoose.Types.ObjectId;
   courseId: mongoose.Types.ObjectId;
@@ -25,7 +25,7 @@ export type IDiscrepancyItem = {
 }
 
 export interface IDiscrepancyReport {
-  _id?: mongoose.Types.ObjectId;
+  _id: mongoose.Types.ObjectId;
   submissionId: mongoose.Types.ObjectId;
   studentId: mongoose.Types.ObjectId;
   courseId: mongoose.Types.ObjectId;

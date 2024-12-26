@@ -1,7 +1,7 @@
 import mongoose, { Schema } from 'mongoose';
 
 export type ICourse = {
-  _id?: mongoose.Types.ObjectId;
+  _id: mongoose.Types.ObjectId;
   title: string;
   courseCode: string;
   description: string;

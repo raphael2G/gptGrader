@@ -1,7 +1,7 @@
 import mongoose, { Schema } from 'mongoose';
 
 export type ISubmission = {
-  _id?: mongoose.Types.ObjectId;
+  _id: mongoose.Types.ObjectId;
   assignmentId: mongoose.Types.ObjectId;
   problemId: mongoose.Types.ObjectId;
   studentId: mongoose.Types.ObjectId;
