@@ -1,13 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { CourseCard } from '@/components/dashboard/CourseCard'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { PlusCircle, X } from 'lucide-react'
 import { useToast } from "@/components/ui/use-toast"
-import { courseApi } from '@@/lib/client-api/courses'
-import { ICourse } from '@@/models/Course'
 import {
   Dialog,
   DialogContent,
@@ -16,78 +14,89 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { UserAuth } from '@/contexts/AuthContext'
+
+import { useEnrolledCourses } from '@/hooks/queries/useUsers'
+import { useJoinCourseByCode } from '@/hooks/queries/useCourses'
 
 export default function Home() {
   const [courseCode, setCourseCode] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [enrolledCourses, setEnrolledCourses] = useState<ICourse[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // const [enrolledCourses1, setEnrolledCourses] = useState<ICourse[]>([])
+  // const [loading, setLoading] = useState(true)
+  // const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
+  const user = UserAuth().user
 
-  useEffect(() => {
-    const fetchEnrolledCourses = async () => {
-      setLoading(true)
-      try {
-        const userId = '1' // This should be replaced with the actual logged-in user's ID
-        const response = await courseApi.getEnrolledCourses(userId)
-        if (response.data) {
-          setEnrolledCourses(response.data)
-        } else {
-          throw new Error(response.error?.error || 'Failed to fetch enrolled courses')
-        }
-      } catch (err) {
-        setError('Failed to fetch enrolled courses')
-        toast({
-          title: "Error",
-          description: "Failed to fetch enrolled courses. Please try again.",
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
-      }
-    }
+  // useEffect(() => {
+  //   const fetchEnrolledCourses = async () => {
+  //     setLoading(true)
+  //     try {
+  //       const userId = '1' // This should be replaced with the actual logged-in user's ID
+  //       const response = await courseApi.getEnrolledCourses(userId)
+  //       if (response.data) {
+  //         setEnrolledCourses(response.data)
+  //       } else {
+  //         throw new Error(response.error?.error || 'Failed to fetch enrolled courses')
+  //       }
+  //     } catch (err) {
+  //       setError('Failed to fetch enrolled courses')
+  //       toast({
+  //         title: "Error",
+  //         description: "Failed to fetch enrolled courses. Please try again.",
+  //         variant: "destructive",
+  //       })
+  //     } finally {
+  //       setLoading(false)
+  //     }
+  //   }
 
-    fetchEnrolledCourses()
-  }, [toast]) // Remove enrolledCourses from the dependency array
+  //   fetchEnrolledCourses()
+  // }, [toast]) // Remove enrolledCourses from the dependency array
+
+  // if (!user) {
+  //   return <div>Loading the user...</div>
+  // }
+
+  const { data: enrolledCourses = [], isLoading, error } = useEnrolledCourses(user?._id.toString() || '', {enabled: !!user?._id });
+  const { mutate: joinCourse, isPending: isJoining } = useJoinCourseByCode();
+
 
   const handleJoinCourse = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    try {
-      // Assuming we have a method to get the current user's ID
-      // For now, we'll use a placeholder user ID
-      const userId = '1'; // This should be replaced with the actual logged-in user's ID
-      const response = await courseApi.addStudent(courseCode, userId);
-      if (response.data) {
-        toast({
-          title: "Course Joined",
-          description: `You have successfully joined the course ${response.data.title}.`,
-        });
-        setEnrolledCourses(prevCourses => [...prevCourses, response.data]);
-      } else {
-        throw new Error(response.error?.error || 'Failed to join course');
+    if (!user) return;
+
+    joinCourse(
+      { courseCode, studentId: user._id.toString() },
+      {
+        onSuccess: (course) => {
+          console.log("Will show toast now, but not fron toast")
+          toast({
+            title: "Course Joined",
+            description: `You have successfully joined the course ${course.title}.`,
+          });
+          setIsDialogOpen(false);
+          setCourseCode('');
+        },
+        onError: (error) => {
+          console.log("Will show toast now, but not fron toast")
+
+          toast({
+            title: "Error",
+            description: error.message || "Failed to join the course. Please try again.",
+            variant: "destructive",
+          });
+        },
+        onSettled: () => {
+          
+        },
       }
-    } catch (err) {
-      toast({
-        title: "Error",
-        description: "Failed to join the course. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-      setIsDialogOpen(false);
-      setCourseCode('');
-    }
+    );
   };
 
-  if (loading) {
-    return <div>Loading courses...</div>
-  }
 
-  if (error) {
-    return <div>Error: {error}</div>
-  }
+  if (isLoading) {return <div>Loading courses...</div>}
+  if (error) {return <div>Error: {error.message}</div>}
 
   return (
     <div className="space-y-6">
@@ -120,16 +129,8 @@ export default function Home() {
                   required
                 />
               </div>
-              <Button type="submit" className="w-full">Join Course</Button>
+              <Button disabled={isJoining} type="submit" className="w-full">{isJoining ? "Joining Course..." : "Join Course"}</Button>
             </form>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute right-4 top-4"
-              onClick={() => setIsDialogOpen(false)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
           </DialogContent>
         </Dialog>
       </div>
