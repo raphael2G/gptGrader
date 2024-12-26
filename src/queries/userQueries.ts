@@ -1,6 +1,7 @@
 import { User } from '@/models/User';
 import { Types } from 'mongoose';
 import dbConnect from '@/lib/mongodb/dbConnect';
+import { Course } from '@/models/Course'
 
 
 export const findUserByFirebaseIdQuery = async (firebaseUid: string) => {
@@ -47,6 +48,7 @@ export const findUserCoursesQuery = async (userId: Types.ObjectId, role: 'studen
   const populatedCourses = await User.findById(userId)
     .populate({
       path: courseArrayToPopulate,
+      model: Course
     })
     .then(user => {
       if (user) {
