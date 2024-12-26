@@ -2,47 +2,15 @@
 
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { userApi } from '@/app/lib/client-api/users'
-import { IUser } from '@@/models/User'
-import { useToast } from "@/components/ui/use-toast"
+import { UserAuth } from '@/contexts/AuthContext'
+
+
 
 export default function AccountPage() {
-  const [user, setUser] = useState<IUser | null>(null)
-  const [loading, setLoading] = useState(true)
-  const { toast } = useToast()
-
-  useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        // For this example, we'll use a hardcoded user ID.
-        // In a real application, you'd get this from an auth context or similar.
-        const userId = '1'
-        const response = await userApi.getUserById(userId)
-        if (response.data) {
-          setUser(response.data)
-        } else {
-          throw new Error(response.error?.error || 'Failed to fetch user data')
-        }
-      } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to load user data. Please try again later.",
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchUserData()
-  }, [toast])
-
-  if (loading) {
-    return <div>Loading user data...</div>
-  }
+  const user = UserAuth().user
 
   if (!user) {
-    return <div>Failed to load user data. Please try again later.</div>
+    return <div>Loading user data...</div>
   }
 
   return (
@@ -53,9 +21,8 @@ export default function AccountPage() {
           <CardTitle>Account Information</CardTitle>
         </CardHeader>
         <CardContent>
-          <p>Name: {user.name}</p>
+          <p>Name: {user.displayName}</p>
           <p>Email: {user.email}</p>
-          <p>Student ID: {user._id}</p>
         </CardContent>
       </Card>
       <Card>
