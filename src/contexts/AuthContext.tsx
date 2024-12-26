@@ -2,12 +2,24 @@
 import { useContext, createContext, useState, useEffect } from "react";
 import { signInWithPopup, signOut, onAuthStateChanged, GoogleAuthProvider } from "@firebase/auth";
 import { FireAuth } from "@/firebase/firebase";
+import { Types } from "mongoose";
 
 interface AuthContext {
-  user: any;
+  user: User | null;
   googleSignIn: () => void;
   logOut: () => void;
   loading: boolean;
+}
+
+interface User {
+  // Essential Firebase Auth fields
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  
+  // MongoDB ID
+  _id: Types.ObjectId;
 }
 
 const AuthContext = createContext<AuthContext>({
@@ -22,7 +34,7 @@ export const UserAuth = () => {
 };
 
 export const AuthContextProvider = ({ children }: any) => {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   const googleSignIn = () => {
