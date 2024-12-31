@@ -7,15 +7,11 @@ really should say "course code already in use"
 2. Need more confirmation before deleting a course
 
 
-
+s
 
 ### After UI Merger
 
-1. managaing rubrics in the manage courses edit course section is not set up to the api yet
 
-
-2. Navigation bar is the same as the calibration one (button at the end says finish calibrating). should not be the case. can fix with simple flag
-/manage-courses/course1/grading/assignment1/problem1/graded/38zc4px1wbz
 
 3. Rubric is the same as the calibration rubric (should not be editable and should not be able to give model feedback) (or maybe we do? need to think about this)
 /manage-courses/course1/grading/assignment1/problem1/graded/38zc4px1wbz
@@ -23,7 +19,6 @@ really should say "course code already in use"
 
 4. need to think a little more about how we want people to be able to grade it. shuold there be an option to just "calibrate" on the entire dataset? i feel like people would want that
 
-5. when I am calibrating, should that finalize the grades? i feel like it should. neet to implement that
 
 6. Under calibration, the amount that we are calibrating is stored as a parameter in the URL. this is probably not a good idea. would rather not have this exposed to the user. 
 
@@ -39,34 +34,17 @@ http://localhost:3000/manage-courses/course1/grading/assignment1/problem1/graded
 11. The back button just does router.back() in a lot of places. this works sometimes, but if there are multiple ways to get there then it does not work as expecte
 
 
-12. the problem card state is not being managed very well right now. this probably needs a large rewrite. i am afraid thats going to be the case for a lot of things
 
 13. For a lot of the graphs, the text color needs to change when in dark mode on the tool tip
 
 14. When we are "grading all submissions" with AI, we should probably make a big pop up which doesn't allow the user to click anything on the screen. 
 manage-courses/course1/grading/assignment1/problem2/setup
 
-15. Whenever a student "resolves" a discrepancy, the resovled rubric item always becomes grey, instead of what the resolution suggests it should become
 
-16. in the http://localhost:3000/manage-courses/course1/discrepancy-reports/assignment3/problem2/k1oj96yntf, [submissionId], we are fetching with the student id since get submission by submissionid is not wokring in the clientApi. this will need adjusted when we switch over
 
-17. various places which use the navigation bar. need to make sure each one has the proper buttons for their use case. 
-
-18. in the discrepancy reports, clicking on a resolved discrepancy report should open up what it was
-
-19. in the student view of discrepancy reports, we need to place everything in better boxes. the professor discrepency reports look good and format things well, while the student ones is just a bunch of text
-
-20. error with background colors in both combined rubric, and professor combined rubric view
 
 21. right now combined rubric and professor view of rubric are very very similar. should probably make them one component with flag for if professor or if student
 
-22. student submit is not updating. confetti is not coming down. it does submit, just cannot see right awya
-
-23. toast is broken in some places
-
-24. i think some of hte discrepancy issues are because of the api, which means we will fix that once we swap over the api
-
-25. manage assignments needs to also be able to add refsol. or maybe consider just making it a question only thing
 
 26. rubric in the calibration section is unclickeable. that way only the AI can grade it, and then to change it you have to give feedback for why
 
@@ -86,4 +64,8 @@ manage-courses/course1/grading/assignment1/problem2/setup
 33. change url to give the assignment name
 - make get assignment by courseId and assignment name
 
- 
+
+35. !!! need to work out the logic for determining if the self grading of an assignment is done or not
+src/app/(dashboard)/courses/[courseId]/assignments/[assignmentId]/page.tsx
+
+36. !!! with users, we need to create a user in mongodb if they do not have firebase id... i am not sure how this is not done, must of got overwritten at some point.
