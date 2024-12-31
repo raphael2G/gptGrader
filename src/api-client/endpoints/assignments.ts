@@ -12,6 +12,16 @@ interface AssignmentApiResponse {
   error?: ApiError;
 }
 
+interface AssignmentApiProblemResponse {
+  data: IProblem | null;
+  error?: ApiError;
+}
+
+interface AssignmentApiRubricItemResponse {
+  data: IRubricItem | null;
+  error?: ApiError;
+}
+
 export const assignmentApi = {
 
 
@@ -95,12 +105,15 @@ export const assignmentApi = {
   upsertProblem: async (
     assignmentId: string,
     problemData: Partial<IProblem>
-  ): Promise<AssignmentApiResponse> => {
+  ): Promise<AssignmentApiProblemResponse> => {
     try {
-      const data = await apiClient.post<any, IAssignment>(
+
+      const data = await apiClient.post<any, IProblem>(
         `/assignments/${assignmentId}/problems`,
         problemData
       );
+
+      
       return { data, error: undefined };
     } catch (err) {
       const error = err as { response?: { data: ApiError } };
@@ -111,15 +124,37 @@ export const assignmentApi = {
     }
   },
 
+  updateProblemReferenceSolution: async (
+    assignmentId: string,
+    problemId: string,
+    referenceSolution: string
+  ): Promise<AssignmentApiResponse> => {
+    try {
+      const response = await apiClient.patch<any, IAssignment>(
+        `/assignments/${assignmentId}/problems/${problemId}/reference-solution`,
+        { referenceSolution }
+      );
+
+
+      return { data: response, error: undefined };
+    } catch (err) {
+      const error = err as { response?: { data: ApiError } };
+      return {
+        data: null,
+        error: error.response?.data || { error: 'Failed to update reference solution' }
+      };
+    }
+  },
+
   /**
    * Deletes a problem from an assignment
    */
   deleteProblem: async (
     assignmentId: string,
     problemId: string
-  ): Promise<AssignmentApiResponse> => {
+  ): Promise<AssignmentApiProblemResponse> => {
     try {
-      const data = await apiClient.delete<any, IAssignment>(
+      const data = await apiClient.delete<any, IProblem>(
         `/assignments/${assignmentId}/problems/${problemId}`
       );
       return { data, error: undefined };
@@ -139,10 +174,10 @@ export const assignmentApi = {
     assignmentId: string,
     problemId: string,
     rubricItemData: Partial<IRubricItem>
-  ): Promise<AssignmentApiResponse> => {
+  ): Promise<AssignmentApiRubricItemResponse> => {
     try {
-      const data = await apiClient.post<any, IAssignment>(
-        `/assignments/${assignmentId}/rubric-items`,
+      const data = await apiClient.post<any, IRubricItem>(
+        `/assignments/${assignmentId}/problems/${problemId}/rubric-items`,
         {
           problemId,
           ...rubricItemData
@@ -165,10 +200,10 @@ export const assignmentApi = {
     assignmentId: string,
     problemId: string,
     itemId: string
-  ): Promise<AssignmentApiResponse> => {
+  ): Promise<AssignmentApiRubricItemResponse> => {
     try {
-      const data = await apiClient.delete<any, IAssignment>(
-        `/assignments/${assignmentId}/rubric-items/${itemId}`,
+      const data = await apiClient.delete<any, IRubricItem>(
+        `/assignments/${assignmentId}/problems/${problemId}/rubric-items/${itemId}`,
         {
           data: { problemId } // Send in request body for DELETE
         }

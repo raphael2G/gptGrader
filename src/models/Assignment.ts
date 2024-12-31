@@ -16,6 +16,7 @@ export type IProblem = {
   }
   rubricFinalized: boolean;
   referenceSolution: string;
+  toBeSelfGraded: boolean;
 }
 
 export type IAssignment = {
@@ -26,8 +27,11 @@ export type IAssignment = {
   dueDate: Date;
   lateDueDate: Date;
   problems: IProblem[];
-  isPublished: boolean;
+
+  // flags
+  isPublished: boolean; 
   areGradesReleased: boolean;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -45,7 +49,8 @@ const problemSchema = new Schema<IProblem>({
     items: [rubricItemSchema]
   }, 
   rubricFinalized: { type: Boolean, default: false }, 
-  referenceSolution: { type: String, default: ''}
+  referenceSolution: { type: String, default: ''},
+  toBeSelfGraded: { type: Boolean, default: false, required: true}
 });
 
 const assignmentSchema = new Schema<IAssignment>({
