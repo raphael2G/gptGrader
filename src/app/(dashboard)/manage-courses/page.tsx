@@ -163,14 +163,20 @@ export default function ManageCoursesPage() {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {courses.length > 0 && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {courses.map((course) => (
           <InstructorCourseCard
             key={course._id?.toString() || course.title}
             course={course}
           />
         ))}
-      </div>
+      </div>}
+
+      {courses.length == 0 && 
+          <p className="text-center text-gray-500 dark:text-gray-400">
+            You are not managing any courses yet. Click the "Add New Course" button to get started!
+          </p>
+      }
 
 
     </div>
