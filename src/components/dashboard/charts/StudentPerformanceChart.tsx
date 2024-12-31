@@ -169,7 +169,7 @@ export function StudentPerformanceChart({ courseId }: { courseId: string }) {
             data={series.data}
             fill={colors[index]}
             dataKey="y"
-            shape={(props) => (
+            shape={(props: any) => (
               <circle
                 cx={props.cx}
                 cy={props.cy}

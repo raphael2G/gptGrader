@@ -109,11 +109,13 @@ export async function updateSubmissionGrading(
       appliedRubricItems,
       feedback
     };
-    console.log("or first is it ehre?")
     
     const updatedSubmission = await updateSubmissionGradingQuery(submissionId, gradingData);
-    console.log("is error?")
-    
+
+    if (!updatedSubmission){
+      throw new Error("For some reason updated submission is null")
+    }
+
     return updatedSubmission;
   } catch (error) {
     throw new Error(`Failed to update submission grading: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -132,6 +134,11 @@ export async function updateSubmissionSelfGrading(
       submissionId,
       selfGradedAppliedRubricItems
     );
+
+    if (!updatedSubmission){
+      throw new Error("For some reason updated submission is null")
+    }
+    
     return updatedSubmission;
   } catch (error) {
     throw new Error(`Failed to update submission self-grading: ${error instanceof Error ? error.message : 'Unknown error'}`);

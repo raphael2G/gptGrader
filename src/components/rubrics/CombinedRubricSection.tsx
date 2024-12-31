@@ -270,7 +270,7 @@ export function CombinedRubricSection({ assignmentId, problemId, studentId }: Co
                         <>
                           <RadioGroup
                             onValueChange={value => setSelectedOption(value as "student" | "instructor")}
-                            value={selectedOption}
+                            value={selectedOption || undefined}
                           >
                             <div className="flex items-center space-x-2">
                               <RadioGroupItem value="student" id={`student-${item._id}`} />

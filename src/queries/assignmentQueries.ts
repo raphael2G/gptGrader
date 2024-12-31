@@ -438,7 +438,7 @@ export const upsertRubricItemQuery = async (
     } else {
 
       // Create new rubric item object
-      const newRubricItem: IRubricItem = {
+      const newRubricItem: Omit<IRubricItem, '_id'> = {
         description: rubricItemData.description!,
         points: rubricItemData.points!
       };

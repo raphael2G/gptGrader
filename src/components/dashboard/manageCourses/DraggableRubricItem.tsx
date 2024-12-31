@@ -6,15 +6,15 @@ import { TableCell, TableRow } from '@/components/ui/table'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { RubricItem } from '@/lib/dummy/courses'
+import { IRubricItem } from '@/models/Assignment'
 import { cn } from "@/lib/utils"
 
 interface DraggableRubricItemProps {
   id: string
-  item: RubricItem
+  item: IRubricItem
   isEditing: boolean
   onEdit: () => void
-  onSave: (updatedItem: RubricItem) => void
+  onSave: (updatedItem: IRubricItem) => void
   onCancel: () => void
   onDelete: () => void
 }
@@ -55,7 +55,12 @@ export function DraggableRubricItem({
   }, [isEditing, item])
 
   const handleSave = () => {
-    onSave({ description, points })
+    const updatedItem: IRubricItem = {
+      _id: item._id,
+      description: description,
+      points: points
+    }
+    onSave(updatedItem)
   }
 
   const isPositive = item.points >= 0

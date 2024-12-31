@@ -116,7 +116,8 @@ export function ProblemView({ courseId, assignmentId, problemId }: ProblemViewPr
         color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-700 dark:text-yellow-200'
       }
     }
-    if (assignment.selfGradingEnabled && !submission?.selfGraded) {
+    // need to come up with good self grading logic
+    if (!submission?.selfGraded) {
       return {
         status: "Need Self Grade",
         color: 'bg-blue-100 text-blue-800 dark:bg-blue-700 dark:text-blue-200'

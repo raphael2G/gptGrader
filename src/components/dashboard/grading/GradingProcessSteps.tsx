@@ -11,7 +11,6 @@ import {
 import { useRouter } from 'next/navigation';
 import { useState } from 'react'
 import { useToast } from "@/components/ui/use-toast"
-import { llmApi } from '@/app/lib/client-api/LLM'
 import { Loader2 } from 'lucide-react'
 import {
   useGetAssignmentById, 
@@ -89,15 +88,18 @@ export function GradingProcessSteps({ courseId, assignmentId, problemId }: Gradi
   const handleGradeAllSubmissions = async () => {
     setIsGrading(true);
     try {
-      const response = await llmApi.gradeAllSubmissions(problemId);
-      if (response.data?.success) {
+      const response = await new Promise(resolve => setTimeout(() => {
+        resolve({
+          // Mock response structure to match what the API would return
+          data: {
+            success: true
+          }
+        });
+        }, 5000)); // 5000 milliseconds = 5 seconds      if (response.data?.success) {
         toast({
           title: "Success",
-          description: response.data.message || "Submissions graded successfully!",
+          description: "Submissions graded successfully!",
         });
-      } else {
-        throw new Error(response.error?.error || "Failed to grade submissions");
-      }
     } catch (error) {
       toast({
         title: "Error",
@@ -199,7 +201,7 @@ export function GradingProcessSteps({ courseId, assignmentId, problemId }: Gradi
                         <TooltipTrigger asChild>
                           <span className="w-full">
                             <Button
-                              onClick={() => router.push(step.link)}
+                              onClick={() => !!step?.link ? router.push(step?.link) : console.log("")}
                               disabled={!hasRubric}
                               variant={hasRubric ? "default" : "secondary"}
                               className={`w-full ${!hasRubric ? 'opacity-50 cursor-not-allowed' : ''}`}

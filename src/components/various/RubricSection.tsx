@@ -253,7 +253,6 @@ export const RubricSection: React.FC<RubricProps> = ({
                     onSave={(updatedItem) => handleSaveRubricItem(updatedItem, itemIndex)}
                     onCancel={() => setEditingItemIndex(-1)}
                     onDelete={() => handleDeleteRubricItem(item._id?.toString())}
-                    disabled={disabled || isLoading}
                   />
                 ))}
               </SortableContext>

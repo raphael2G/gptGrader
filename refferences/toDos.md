@@ -67,5 +67,6 @@ manage-courses/course1/grading/assignment1/problem2/setup
 
 35. !!! need to work out the logic for determining if the self grading of an assignment is done or not
 src/app/(dashboard)/courses/[courseId]/assignments/[assignmentId]/page.tsx
+src/components/dashboard/courses/ProblemView.tsx
 
 36. !!! with users, we need to create a user in mongodb if they do not have firebase id... i am not sure how this is not done, must of got overwritten at some point.

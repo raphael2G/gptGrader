@@ -4,13 +4,11 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { BackButton } from '@/components/various/BackButton'
-import { llmApi } from '@/app/lib/client-api/LLM'
-import { IRubricItem } from '@@/models/Assignment'
 import { useToast } from "@/components/ui/use-toast"
 import { Loader2 } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { RubricSection } from '@/components/various/RubricSection'
-import { useGetAssignmentById, useUpdateAssignment, useUpsertProblem } from '@/hooks/queries/useAssignments'
+import { useGetAssignmentById, useUpdateAssignment, useUpsertProblem, useUpsertRubricItem} from '@/hooks/queries/useAssignments'
 
 interface LLMAnalysisResult {
   commonCorrectThings: string[];
@@ -39,6 +37,7 @@ export default function MakeRubricPage({
   } = useGetAssignmentById(params.assignmentId)
 
   const { mutate: upsertProblem } = useUpsertProblem()
+  const { mutate: upsertRubricItem, isPending: upsertingRubricItem } = useUpsertRubricItem()
 
   // Derived state
   const problem = assignment?.problems.find(p => p._id?.toString() === params.problemId)
@@ -48,12 +47,15 @@ export default function MakeRubricPage({
   const fetchLlmAnalysis = async (problemId: string, referenceSolution: string) => {
     setLlmLoading(true)
     try {
-      const response = await llmApi.analyzeSubmissions(problemId, referenceSolution)
-      if (response.data) {
-        setLlmAnalysis(response.data)
-      } else {
-        throw new Error(response.error?.error || 'Failed to analyze submissions')
-      }
+      const response = await new Promise(resolve => setTimeout(() => {
+        resolve({
+          // Mock response structure to match what the API would return
+          data: {
+            success: true
+          }
+        });
+      }, 5000)); // 5000 milliseconds = 5 seconds
+
     } catch (err) {
       toast({
         title: "Error",
@@ -70,30 +72,6 @@ export default function MakeRubricPage({
     fetchLlmAnalysis(problem._id?.toString() || '', problem.referenceSolution)
   }
 
-  const handleRubricChange = (newRubricItems: IRubricItem[]) => {
-    if (!problem) return
-
-    upsertProblem(
-      {
-        assignmentId: params.assignmentId,
-        problemData: {
-          ...problem,
-          rubric: {
-            items: newRubricItems
-          }
-        }
-      },
-      {
-        onError: (error) => {
-          toast({
-            title: "Error",
-            description: error.message || "Failed to update rubric. Please try again.",
-            variant: "destructive",
-          })
-        }
-      }
-    )
-  }
 
   const handleSaveRubric = async () => {
     if (!problem) return
@@ -127,62 +105,13 @@ export default function MakeRubricPage({
       }
     )
   }
-
+  
   const handleGenerateRubric = async () => {
     if (!problem || !llmAnalysis || !assignment) return
+    
+    setGeneratingRubric(false)
+    
 
-    setGeneratingRubric(true)
-    try {
-      const response = await llmApi.generateRubric(
-        problem._id?.toString() || '',
-        problem.question,
-        problem.referenceSolution || '',
-        llmAnalysis.commonCorrectThings,
-        llmAnalysis.commonMistakes
-      )
-
-      if (response.data) {
-        const generatedRubricItems: IRubricItem[] = response.data.rubricItems.map(item => ({
-          description: item.description,
-          points: item.points
-        }))
-
-        upsertProblem(
-          {
-            assignmentId: params.assignmentId,
-            problemData: {
-              ...problem,
-              rubric: {
-                items: generatedRubricItems
-              }
-            }
-          },
-          {
-            onSuccess: () => {
-              toast({
-                title: "Success",
-                description: "Rubric generated successfully.",
-              })
-            },
-            onError: (error) => {
-              toast({
-                title: "Error",
-                description: error.message || "Failed to update generated rubric.",
-                variant: "destructive",
-              })
-            }
-          }
-        )
-      }
-    } catch (err) {
-      toast({
-        title: "Error",
-        description: "Failed to generate rubric. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setGeneratingRubric(false)
-    }
   }
 
   // Loading states

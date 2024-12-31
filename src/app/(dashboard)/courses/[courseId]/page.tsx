@@ -1,15 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { courseApi } from '@/app/lib/client-api/courses'
-import { assignmentApi } from '@/app/lib/client-api/assignments'
-import { ICourse } from '@@/models/Course'
+
 import { BackButton } from '@/components/various/BackButton'
 import { AssignmentCard } from '@/components/dashboard/courses/AssignmentCard'
 import { useToast } from "@/components/ui/use-toast"
 import { Loader2 } from 'lucide-react'
-import { IAssignment } from '@/app/models/Assignment'
+
 import { EmptyState } from '@/components/various/EmptyState';
 import { useGetCourseById } from '@/hooks/queries/useCourses'
 import { useGetAssignmentsByArrayOfIds } from "@/hooks/queries/useAssignments"
