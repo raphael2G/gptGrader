@@ -5,6 +5,7 @@ import { AuthContextProvider } from '@/contexts/AuthContext'
 import { Inter } from 'next/font/google'
 import { ReactQueryProvider } from '@/contexts/ReactQueryProvider'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -27,6 +28,7 @@ export default function RootLayout({
             {children}
             <Toaster />
             <ReactQueryDevtools/>
+            <SpeedInsights />
           </AuthContextProvider>
         </ReactQueryProvider>
       </body>
