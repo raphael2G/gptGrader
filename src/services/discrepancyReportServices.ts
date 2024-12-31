@@ -68,11 +68,15 @@ export async function resolveDiscrepancyReportItem(
   rubricItemId: Types.ObjectId,
   resolution: {
     shouldItemBeApplied: boolean;
-    explanation: boolean;
+    explanation: string;
     resolvedBy: Types.ObjectId;
   }
 ) {
   try {
+    console.log("made it to here - services")
+    console.log("made it to here - services")
+    console.log("made it to here - services")
+    console.log("made it to here - services")
     const report = await resolveDiscrepancyItemQuery(submissionId, rubricItemId, resolution);
     return report;
   } catch (error) {

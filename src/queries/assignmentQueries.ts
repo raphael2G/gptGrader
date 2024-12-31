@@ -190,29 +190,45 @@ export const upsertProblemQuery = async (
   problemData: Partial<IProblem>
 ) => {
   await dbConnect();
-
+  
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
     const assignment = await Assignment.findById(assignmentId).session(session);
+    console.log("found assignment")
+
     if (!assignment) {
+      console.log("did not find assignment")
       throw new Error('Assignment not found');
     }
 
     if (problemData._id) {
+
       // Update existing problem
       const existingProblemIndex = assignment.problems.findIndex(
         (p: IProblem & { _id: Types.ObjectId }) => p._id.toString() === problemData._id!.toString()
       );
 
+      
+
+
+
       if (existingProblemIndex >= 0) {
+
+        console.log("fonud problem")
+        console.log("fonud problem")
+        console.log("fonud problem")
+        console.log("fonud problem")
+        console.log("goofy")
+
         // Preserve existing _id and merge with new data
         assignment.problems[existingProblemIndex] = {
           ...assignment.problems[existingProblemIndex],
           ...problemData,
           _id: assignment.problems[existingProblemIndex]._id // Ensure _id doesn't get overwritten
         };
+
       } else {
         throw new Error('Problem not found with provided _id');
       }
@@ -227,7 +243,10 @@ export const upsertProblemQuery = async (
 
 
     const updatedAssignment = await assignment.save({ session });
+
     await session.commitTransaction();
+
+
     return updatedAssignment;
   } catch (error) {
     await session.abortTransaction();
@@ -235,6 +254,35 @@ export const upsertProblemQuery = async (
   } finally {
     session.endSession();
   }
+};
+
+export const updateProblemReferenceSolutionQuery = async (
+  assignmentId: Types.ObjectId,
+  problemId: Types.ObjectId,
+  referenceSolution: string
+) => {
+  await dbConnect();
+  
+  // Convert string IDs to ObjectIds if necessary
+
+  const updatedAssignment = await Assignment.findOneAndUpdate(
+    { 
+      _id: assignmentId,
+      'problems._id': problemId 
+    },
+    { 
+      $set: { 
+        'problems.$.referenceSolution': referenceSolution 
+      } 
+    },
+    { new: true }
+  );
+
+  if (!updatedAssignment) {
+    throw new Error('Assignment or problem not found');
+  }
+
+  return updatedAssignment;
 };
 
 /**

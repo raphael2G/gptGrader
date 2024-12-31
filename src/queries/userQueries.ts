@@ -4,9 +4,22 @@ import dbConnect from '@/lib/mongodb/dbConnect';
 import { Course } from '@/models/Course'
 
 
+
+
+export const getUserByIdQuery = async (userId: Types.ObjectId) => {
+  await dbConnect();
+  
+  try {
+    const user = await User.findById(userId)
+    return user;
+  } catch (error) {
+    throw new Error(`Failed to get user: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+};
+
 export const findUserByFirebaseIdQuery = async (firebaseUid: string) => {
   await dbConnect();
-  return User.findOne({ firebaseUid });
+  return User.findOne({ "firebaseUid": firebaseUid });
 };
 
 export const createUserQuery = async (userData: {

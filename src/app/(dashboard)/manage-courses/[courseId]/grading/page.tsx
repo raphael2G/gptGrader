@@ -1,61 +1,58 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { BackButton } from '@/components/various/BackButton'
-import { courseApi } from '@/app/lib/client-api/courses'
-import { assignmentApi } from '@/app/lib/client-api/assignments'
-import { ICourse } from '@@/models/Course'
-import { IAssignment } from '@@/models/Assignment'
-import { useToast } from "@/components/ui/use-toast"
-import Link from 'next/link'
 import { Badge } from "@/components/ui/badge"
-
-interface AssignmentWithUniqueSubmissions extends IAssignment {
-  uniqueSubmissions: number
-}
+import { useGetCourseById } from '@/hooks/queries/useCourses'
+import { useGetAssignmentsByArrayOfIds } from '@/hooks/queries/useAssignments'
+import { IAssignment } from '@/models/Assignment'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useToast } from "@/components/ui/use-toast"
+import { Loader2 } from "lucide-react"
 
 export default function GradingPage({ params }: { params: { courseId: string } }) {
-  const [course, setCourse] = useState<ICourse | null>(null)
-  const [assignments, setAssignments] = useState<AssignmentWithUniqueSubmissions[]>([])
-  const [loading, setLoading] = useState(true)
+  // Hooks
   const router = useRouter()
   const { toast } = useToast()
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true)
-      try {
-        const [courseResponse, assignmentsResponse] = await Promise.all([
-          courseApi.getCourseById(params.courseId),
-          assignmentApi.getAllAssignmentsWithSubmissionInfo(params.courseId)
-        ])
+  // Queries
+  const { 
+    data: course, 
+    isLoading: courseLoading,
+    error: courseError
+  } = useGetCourseById(params.courseId)
 
-        if (courseResponse.data && assignmentsResponse.data) {
-          setCourse(courseResponse.data)
-          setAssignments(assignmentsResponse.data) // Removed filter, handle status in badge
-        } else {
-          throw new Error('Failed to fetch course or assignments data')
-        }
-      } catch (err) {
-        toast({
-          title: "Error",
-          description: "Failed to fetch data. Please try again.",
-          variant: "destructive",
-        })
-        router.push('/manage-courses')
-      } finally {
-        setLoading(false)
-      }
-    }
+  const {
+    assignments = [],
+    isLoading: assignmentsLoading,
+    error: assignmentsError
+  } = useGetAssignmentsByArrayOfIds(
+    course?.assignments?.map(id => id.toString()) || [],
+    { enabled: !!course }
+  )
 
-    fetchData()
-  }, [params.courseId, router, toast])
+  // Loading states
+  const isLoading = courseLoading || assignmentsLoading
 
-  if (loading) {
-    return <div>Loading grading data...</div>
+  // Error handling
+  if (courseError || assignmentsError) {
+    toast({
+      title: "Error loading data",
+      description: (courseError || assignmentsError)?.message || "Please try again later",
+      variant: "destructive"
+    })
+    router.push('/manage-courses')
+    return null
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
   }
 
   if (!course) {
@@ -69,7 +66,7 @@ export default function GradingPage({ params }: { params: { courseId: string } }
       status = 'Unreleased';
     } else if (new Date() < assignment.dueDate) {
       status = 'Open';
-    } else if (new Date() < assignment.finalSubmissionDeadline) {
+    } else if (new Date() < assignment.lateDueDate) {
       status = 'Overdue';
     } else if (!assignment.areGradesReleased) {
       status = 'Closed';
@@ -109,19 +106,17 @@ export default function GradingPage({ params }: { params: { courseId: string } }
                 <TableRow>
                   <TableHead>Assignment</TableHead>
                   <TableHead>Due Date</TableHead>
-                  <TableHead>Final Submission Deadline</TableHead>
-                  <TableHead>Unique Submissions</TableHead>
+                  <TableHead>Late Due Date</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {assignments.map((assignment) => (
-                  <TableRow key={assignment._id}>
+                  <TableRow key={assignment._id.toString()}>
                     <TableCell>{assignment.title}</TableCell>
                     <TableCell>{new Date(assignment.dueDate).toLocaleDateString()}</TableCell>
-                    <TableCell>{new Date(assignment.finalSubmissionDeadline).toLocaleDateString()}</TableCell>
-                    <TableCell>{assignment.uniqueSubmissions}</TableCell>
+                    <TableCell>{new Date(assignment.lateDueDate).toLocaleDateString()}</TableCell>
                     <TableCell>{getGradingStatusBadge(assignment)}</TableCell>
                     <TableCell>
                       <Link 
@@ -141,4 +136,3 @@ export default function GradingPage({ params }: { params: { courseId: string } }
     </div>
   )
 }
-

@@ -1,53 +1,44 @@
-'use client';
+'use client'
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { BackButton } from '@/components/various/BackButton';
-import { ProblemView } from '@/components/dashboard/courses/ProblemView';
-import { GradedProblemView } from '@/components/dashboard/courses/GradedProblemView';
-import { assignmentApi } from '@/app/lib/client-api/assignments';
-import { useToast } from "@/components/ui/use-toast";
-import { Loader2 } from 'lucide-react';
+import { BackButton } from '@/components/various/BackButton'
+import { ProblemView } from '@/components/dashboard/courses/ProblemView'
+import { GradedProblemView } from '@/components/dashboard/courses/GradedProblemView'
+import { Loader2 } from 'lucide-react'
+import { useGetAssignmentById } from '@/hooks/queries/useAssignments'
+import { useRouter } from 'next/navigation'
 
-export default function ProblemPage({ params }: { params: { courseId: string, assignmentId: string, problemId: string } }) {
-  const [gradesReleased, setGradesReleased] = useState<boolean | null>(null);
-  const { toast } = useToast();
-  const router = useRouter();
+export default function ProblemPage({params}: { params: { courseId: string, assignmentId: string, problemId: string  }}) {
+  const router = useRouter()
 
-  useEffect(() => {
-    const checkGradeStatus = async () => {
-      try {
-        const response = await assignmentApi.getAssignmentById(params.assignmentId);
-        if (response.data) {
-          setGradesReleased(response.data.areGradesReleased);
-        } else {
-          throw new Error(response.error?.error || 'Failed to fetch assignment status');
-        }
-      } catch (error: any) {
-        toast({
-          title: 'Error',
-          description: error.message,
-          variant: 'destructive'
-        });
-        router.push(`/courses/${params.courseId}/assignments/${params.assignmentId}`);
-      }
-    };
+  const { data: assignment, isLoading, error } = useGetAssignmentById(params.assignmentId)
 
-    checkGradeStatus();
-  }, [params.assignmentId, params.courseId, toast, router]);
+  // Handle error state
+  if (error) {
+    router.push(`/courses/${params.courseId}/assignments/${params.assignmentId}`)
+    return <div>Uh oh. something went wrong loading this problem...</div>
+  }
 
-  if (gradesReleased === null) {
+  // Loading state
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
-    );
+    )
   }
+
+  // If we have no assignment data, something went wrong
+  if (!assignment) {
+    router.push(`/courses/${params.courseId}/assignments/${params.assignmentId}`)
+    return null
+  }
+
+  
 
   return (
     <div className="space-y-6">
       <BackButton />
-      {gradesReleased ? (
+      {assignment.areGradesReleased ? (
         <GradedProblemView
           courseId={params.courseId}
           assignmentId={params.assignmentId}
@@ -61,6 +52,5 @@ export default function ProblemPage({ params }: { params: { courseId: string, as
         />
       )}
     </div>
-  );
+  )
 }
-

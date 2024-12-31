@@ -1,21 +1,26 @@
-'use client'
-
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { courseApi } from '@/app/lib/client-api/courses'
-import { submissionApi } from '@/app/lib/client-api/submissions'
-import { IUser } from '@@/models/User'
 import { cn } from "@/lib/utils"
 import Link from 'next/link'
+import { Loader2 } from "lucide-react"
+import { useGetCourseById } from '@/hooks/queries/useCourses'
+import { useGetAssignmentsByArrayOfIds } from '@/hooks/queries/useAssignments'
+import { useGetUserById } from '@/hooks/queries/useUsers'
+import { useGetSubmissionsByStudentId } from '@/hooks/queries/useSubmissions'
+import React from 'react'
 
 type SortField = 'name' | 'email' | 'updatedAt' | 'completionRate' | 'pointsEarnedRate'
 type SortOrder = 'asc' | 'desc'
 
-interface StudentWithStats extends IUser {
-  completionRate: number | null
-  pointsEarnedRate: number | null
+interface ProcessedStudentData {
+  _id: string
+  name: string
+  email: string
+  completionRate: number
+  pointsEarnedRate: number
+  updatedAt: Date
 }
 
 const LongArrowUp = ({ className }: { className?: string }) => (
@@ -33,47 +38,94 @@ const LongArrowDown = ({ className }: { className?: string }) => (
 )
 
 export function StudentList({ courseId }: { courseId: string }) {
-  const [students, setStudents] = useState<StudentWithStats[]>([])
+  // Local state for sorting
   const [sortField, setSortField] = useState<SortField>('name')
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true)
-        const studentsResponse = await courseApi.getStudentsInCourse(courseId)
-        
-        if (!studentsResponse.data) {
-          throw new Error(studentsResponse.error?.error || 'Failed to fetch students')
-        }
+  // Fetch course data
+  const { data: course, isLoading: isCourseLoading, error: courseError } = useGetCourseById(courseId)
 
-        const enrolledStudents = studentsResponse.data
+  // Fetch assignments for this course
+  const { assignments, isLoading: isAssignmentsLoading, error: assignmentsError } = 
+    useGetAssignmentsByArrayOfIds(course?.assignments?.map(id => id.toString()) || [])
 
-        const studentsWithStats = await Promise.all(enrolledStudents.map(async (student) => {
-          const statsResponse = await submissionApi.getStudentCourseStats(courseId, student._id)
-          
-          return {
-            ...student,
-            completionRate: statsResponse.data ? statsResponse.data.completionRate : null,
-            pointsEarnedRate: statsResponse.data ? statsResponse.data.pointsEarnedRate : null
-          }
-        }))
+  // Fetch user data and submissions for each student
+  const studentQueries = course?.students?.map(studentId => ({
+    user: useGetUserById(studentId.toString()),
+    submissions: useGetSubmissionsByStudentId(studentId.toString())
+  })) || []
 
-        setStudents(studentsWithStats)
-        setError(null)
-      } catch (err) {
-        setError('Failed to fetch student data')
-        console.error(err)
-      } finally {
-        setLoading(false)
+  const isStudentDataLoading = studentQueries.some(query => query.user.isLoading || query.submissions.isLoading)
+  const studentDataError = studentQueries.find(query => query.user.error || query.submissions.error)?.user.error
+
+  // Calculate total problems and points across all assignments
+  const totalProblems = assignments?.reduce((acc, assignment) => 
+    acc + assignment.problems.length, 0) || 0
+
+  const totalPoints = assignments?.reduce((acc, assignment) => 
+    acc + assignment.problems.reduce((sum, problem) => sum + problem.maxPoints, 0), 0) || 0
+
+  // Process student data
+  const processedStudentData: ProcessedStudentData[] = React.useMemo(() => {
+    if (!course?.students || !assignments || studentQueries.some(q => !q.user.data || !q.submissions.data)) return []
+
+    const courseAssignmentIds = new Set(course.assignments.map(id => id.toString()))
+
+    return course.students.map(studentId => {
+      const studentQuery = studentQueries.find(q => 
+        q.user.data?._id.toString() === studentId.toString()
+      )
+      
+      if (!studentQuery) return null
+
+      const { user: { data: userData }, submissions: { data: allSubmissions } } = studentQuery
+
+      // Filter submissions to only include those from this course's assignments
+      const courseSubmissions = allSubmissions?.filter(submission => 
+        courseAssignmentIds.has(submission.assignmentId.toString())
+      ) || []
+
+      // Calculate completion rate
+      const totalSubmitted = new Set(courseSubmissions.map(sub => sub.problemId.toString())).size
+      const completionRate = (totalSubmitted / totalProblems) * 100
+
+      // Calculate points earned rate
+      const pointsEarned = courseSubmissions.reduce((acc, submission) => {
+        const problem = assignments
+          .flatMap(a => a.problems)
+          .find(p => p._id?.toString() === submission.problemId.toString())
+
+        if (!problem || !submission.appliedRubricItems) return acc
+
+        const earnedForSubmission = submission.appliedRubricItems.reduce((sum, itemId) => {
+          const rubricItem = problem.rubric.items.find(item => 
+            item._id?.toString() === itemId.toString()
+          )
+          return sum + (rubricItem?.points || 0)
+        }, 0)
+
+        return acc + earnedForSubmission
+      }, 0)
+
+      const pointsEarnedRate = (pointsEarned / totalPoints) * 100
+
+      // Get the latest submission date
+      const latestSubmission = courseSubmissions.reduce((latest, current) => {
+        return latest.submittedAt > current.submittedAt ? latest : current
+      }, courseSubmissions[0])
+
+      return {
+        _id: studentId.toString(),
+        name: userData?.name || 'Unknown Student',
+        email: userData?.email || 'No email',
+        completionRate,
+        pointsEarnedRate,
+        updatedAt: latestSubmission?.submittedAt || new Date()
       }
-    }
+    }).filter((student): student is ProcessedStudentData => student !== null)
+  }, [course?.students, course?.assignments, assignments, studentQueries])
 
-    fetchData()
-  }, [courseId])
-
+  // Sorting function
   const sortStudents = (field: SortField) => {
     if (field === sortField) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
@@ -81,26 +133,41 @@ export function StudentList({ courseId }: { courseId: string }) {
       setSortField(field)
       setSortOrder('asc')
     }
-
-    const sortedStudents = [...students].sort((a, b) => {
-      let comparison = 0
-      if (field === 'name' || field === 'email') {
-        comparison = a[field].localeCompare(b[field])
-      } else if (field === 'updatedAt') {
-        comparison = new Date(a[field]).getTime() - new Date(b[field]).getTime()
-      } else {
-        const aValue = a[field] ?? -1
-        const bValue = b[field] ?? -1
-        comparison = aValue - bValue
-      }
-      return sortOrder === 'asc' ? comparison : -comparison
-    })
-
-    setStudents(sortedStudents)
   }
 
-  const SortableHeader = ({ field, label }: { field: SortField, label: string }) => (
-    <TableHead>
+  // Sort the processed data
+  const sortedStudents = [...processedStudentData].sort((a, b) => {
+    let comparison = 0
+    if (sortField === 'name' || sortField === 'email') {
+      comparison = a[sortField].localeCompare(b[sortField])
+    } else if (sortField === 'updatedAt') {
+      comparison = new Date(a[sortField]).getTime() - new Date(b[sortField]).getTime()
+    } else {
+      comparison = (a[sortField] ?? -1) - (b[sortField] ?? -1)
+    }
+    return sortOrder === 'asc' ? comparison : -comparison
+  })
+
+  // Loading state
+  if (isCourseLoading || isAssignmentsLoading || isStudentDataLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  // Error state
+  if (courseError || assignmentsError || studentDataError) {
+    return (
+      <div className="text-red-500 p-4">
+        Error loading student data: {(courseError || assignmentsError || studentDataError)?.message}
+      </div>
+    )
+  }
+
+  const SortableHeader = ({ field, label, className }: { field: SortField, label: string, className?: string }) => (
+    <TableHead className={className}>
       <Button 
         variant="ghost" 
         onClick={() => sortStudents(field)} 
@@ -125,14 +192,6 @@ export function StudentList({ courseId }: { courseId: string }) {
     </TableHead>
   )
 
-  if (loading) {
-    return <div>Loading student data...</div>
-  }
-
-  if (error) {
-    return <div>Error: {error}</div>
-  }
-
   return (
     <Card>
       <CardHeader>
@@ -144,13 +203,12 @@ export function StudentList({ courseId }: { courseId: string }) {
             <TableRow>
               <SortableHeader field="name" label="Name" />
               <SortableHeader field="email" label="Email" />
-              <SortableHeader field="updatedAt" label="Last Updated" className="text-center" />
               <SortableHeader field="completionRate" label="Submissions" className="text-center" />
               <SortableHeader field="pointsEarnedRate" label="Points Earned" className="text-center" />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {students.map((student) => (
+            {sortedStudents.map((student) => (
               <TableRow key={student._id}>
                 <TableCell>
                   <Link href={`/manage-courses/${courseId}/students/${student._id}`} className="text-blue-600 hover:underline">
@@ -158,16 +216,11 @@ export function StudentList({ courseId }: { courseId: string }) {
                   </Link>
                 </TableCell>
                 <TableCell>{student.email}</TableCell>
-                <TableCell className="text-center">{new Date(student.updatedAt).toLocaleDateString()}</TableCell>
                 <TableCell className="text-center">
-                  {student.completionRate !== null
-                    ? `${(student.completionRate * 100).toFixed(0)}%` 
-                    : '-'}
+                  {student.completionRate.toFixed(1)}%
                 </TableCell>
                 <TableCell className="text-center">
-                  {student.pointsEarnedRate !== null
-                    ? `${(student.pointsEarnedRate * 100).toFixed(0)}%` 
-                    : '-'}
+                  {student.pointsEarnedRate.toFixed(1)}%
                 </TableCell>
               </TableRow>
             ))}
@@ -177,4 +230,3 @@ export function StudentList({ courseId }: { courseId: string }) {
     </Card>
   )
 }
-

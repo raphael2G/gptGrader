@@ -1,32 +1,26 @@
 // src/queries/submissionQueries.ts
-
-import { Types } from 'mongoose';
-import { Submission, ISubmission } from '@/models/Submission';
+import { ISubmission, Submission } from "@/models/Submission";
+import { Types } from "mongoose";
 
 interface UpsertSubmissionData extends Partial<Omit<ISubmission, '_id' | 'createdAt' | 'updatedAt'>> {
-  assignmentId: Types.ObjectId;  // These three fields are always required
-  problemId: Types.ObjectId;     // to identify a unique submission
+  assignmentId: Types.ObjectId;
+  problemId: Types.ObjectId;
   studentId: Types.ObjectId;
 }
 
-/**
- * Gets a submission by its ID
- */
 export async function getSubmissionByIdQuery(submissionId: Types.ObjectId): Promise<ISubmission | null> {
   return await Submission.findById(submissionId);
 }
 
 /**
- * Creates or updates a submission
+ * Creates a new submission or updates an existing one
+ * First checks for existing submission by student and problem
+ * If none exists, creates a new submission
  */
-export async function upsertSubmissionQuery(submissionData: UpsertSubmissionData): Promise<ISubmission> {
-  const filter = {
-    assignmentId: submissionData.assignmentId,
-    problemId: submissionData.problemId,
-    studentId: submissionData.studentId
-  };
-
-  // If this is a new submission, set these default values
+export async function upsertSubmissionQuery(submissionData: Partial<ISubmission>): Promise<ISubmission | null> {
+  
+  
+  // Default values for new submissions
   const defaults = {
     submittedAt: new Date(),
     graded: false,
@@ -40,38 +34,98 @@ export async function upsertSubmissionQuery(submissionData: UpsertSubmissionData
     submissionData.selfGradingCompletedAt = new Date();
   }
 
-  // Combine defaults with submitted data, but only for new documents
-  return await Submission.findOneAndUpdate(
-    filter,
-    { 
-      $setOnInsert: defaults,
-      $set: submissionData
+  try {
+    // Find existing submission by student and problem
+    const existingSubmission = await Submission.findOne({
+      studentId: submissionData.studentId,
+      problemId: submissionData.problemId,
+      assignmentId: submissionData.assignmentId
+    });
+
+    if (existingSubmission) {
+      console.log("foound submission! updating! - -- - - - - - -")
+      // Update existing submission
+      return await Submission.findByIdAndUpdate(
+        existingSubmission._id,
+        {
+          $set: submissionData
+        },
+        {
+          new: true,
+          runValidators: true
+        }
+      );
+    } else {
+      // Create new submission with defaults
+      console.log("did not find submission! creatung! - -- - - - - - -")
+
+      const newSubmission = new Submission({
+        ...defaults,
+        ...submissionData
+      });
+      return await newSubmission.save();
+    }
+  } catch (error) {
+    console.error('Error upserting submission:', error);
+    throw error;
+  }
+}
+
+
+export async function getSubmissionsByStudentIdQuery(studentId: Types.ObjectId): Promise<ISubmission[]> {
+  return await Submission.find({ studentId });
+}
+
+export async function getSubmissionsByAssignmentIdQuery(assignmentId: Types.ObjectId): Promise<ISubmission[]> {
+  return await Submission.find({ assignmentId });
+}
+
+export async function getSubmissionsByProblemIdQuery(problemId: Types.ObjectId): Promise<ISubmission[]> {
+  return await Submission.find({ problemId });
+}
+
+export async function updateSubmissionGradingQuery(
+  submissionId: Types.ObjectId,
+  gradingData: {
+    gradedBy: Types.ObjectId;
+    appliedRubricItems: Types.ObjectId[];
+    feedback?: string;
+  }
+): Promise<ISubmission | null> {
+  return await Submission.findByIdAndUpdate(
+    submissionId,
+    {
+      $set: {
+        graded: true,
+        gradedAt: new Date(),
+        gradedBy: gradingData.gradedBy,
+        appliedRubricItems: gradingData.appliedRubricItems,
+        feedback: gradingData.feedback
+      }
     },
     { 
-      new: true,      // Return the updated/inserted document
-      upsert: true    // Create if doesn't exist
+      new: true,
+      runValidators: true
     }
   );
 }
 
-/**
- * Gets all submissions by a student
- */
-export async function getSubmissionsByStudentQuery(studentId: Types.ObjectId): Promise<ISubmission[]> {
-  return await Submission.find({ studentId: studentId });
+export async function updateSubmissionSelfGradingQuery(
+  submissionId: Types.ObjectId,
+  selfGradedAppliedRubricItems: Types.ObjectId[]
+): Promise<ISubmission | null> {
+  return await Submission.findByIdAndUpdate(
+    submissionId,
+    {
+      $set: {
+        selfGraded: true,
+        selfGradingCompletedAt: new Date(),
+        selfGradedAppliedRubricItems
+      }
+    },
+    { 
+      new: true,
+      runValidators: true
+    }
+  );
 }
-
-/**
- * Gets all submissions for an assignment
- */
-export async function getSubmissionsByAssignmentQuery(assignmentId: Types.ObjectId): Promise<ISubmission[]> {
-  return await Submission.find({ assignmentId: assignmentId });
-}
-
-/**
- * Gets all submissions for a problem
- */
-export async function getSubmissionsByProblemQuery(problemId: Types.ObjectId): Promise<ISubmission[]> {
-  return await Submission.find({ problemId: problemId });
-}
-

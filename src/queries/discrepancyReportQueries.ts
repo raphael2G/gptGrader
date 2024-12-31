@@ -162,7 +162,7 @@ export async function resolveDiscrepancyItemQuery(
   rubricItemId: Types.ObjectId,
   resolution: {
     shouldItemBeApplied: boolean;
-    explanation: boolean;
+    explanation: string;
     resolvedBy: Types.ObjectId;
   }
 ) {
@@ -172,38 +172,50 @@ export async function resolveDiscrepancyItemQuery(
   session.startTransaction();
 
   try {
-    const report = await DiscrepancyReport.findOne({
-      submissionId
-    }).session(session);
-
-    if (!report) {
-      throw new Error(`No discrepancy report found for submission ID: ${submissionId}`);
-    }
-
-    // Find and update the specific item
-    const itemIndex = report.items.findIndex(
-      (item: IRubricItem) => item._id?.toString() === rubricItemId.toString()
+    // Instead of finding and updating in memory, use updateOne with $set
+    console.log("Schema of resolution.explanation:", DiscrepancyReport.schema.path('items.0.resolution.explanation'));
+  console.log("Type of incoming explanation:", typeof resolution.explanation);
+      const result = await DiscrepancyReport.updateOne(
+      {
+        "submissionId": submissionId,
+        "items.rubricItemId": rubricItemId
+      },
+      {
+        $set: {
+          [`items.$.resolution`]: {
+            shouldItemBeApplied: resolution.shouldItemBeApplied,
+            explanation: resolution.explanation,
+            resolvedBy: resolution.resolvedBy,
+            resolvedAt: new Date()
+          }
+        }
+      },
+      { session }
     );
 
-    if (itemIndex === -1) {
+    if (result.matchedCount === 0) {
       throw new Error(`No discrepancy item found for rubric item ID: ${rubricItemId} in report`);
     }
 
-    // Update the item's resolution
-    report.items[itemIndex].resolution = {
-      ...resolution,
-      resolvedAt: new Date()
-    };
+    // Now fetch the updated document
+    const updatedReport = await DiscrepancyReport.findOne({
+      "submissionId": submissionId
+    }).session(session);
 
-    // Check if all items are resolved
-    const allResolved = report.items.every((item: IDiscrepancyItem) => item.resolution);
-    if (allResolved) {
-      report.status = 'resolved';
+    if (!updatedReport) {
+      throw new Error(`No discrepancy report found for submission ID: ${submissionId}`);
     }
 
-    await report.save({ session });
+    // Check if all items are resolved
+    const allResolved = updatedReport.items.every((item: IDiscrepancyItem) => item.resolution);
+    if (allResolved) {
+      updatedReport.status = 'resolved';
+      await updatedReport.save({ session });
+    }
+
     await session.commitTransaction();
-    return report;
+    return updatedReport;
+
   } catch (error) {
     await session.abortTransaction();
     throw new Error(`Failed to resolve discrepancy item: ${error instanceof Error ? error.message : 'Unknown error'}`);

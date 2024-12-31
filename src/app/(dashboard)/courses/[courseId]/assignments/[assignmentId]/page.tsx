@@ -1,65 +1,47 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { notFound } from 'next/navigation'
 import { BackButton } from '@/components/various/BackButton'
 import { Loader2 } from 'lucide-react'
-import { assignmentApi } from '@/app/lib/client-api/assignments'
-import { submissionApi } from '@/app/lib/client-api/submissions'
-import { IAssignment, IProblem } from '@@/models/Assignment'
-import { ISubmission } from '@@/models/Submission'
+import { ISubmission } from '@/models/Submission'
 import { useToast } from "@/components/ui/use-toast"
 import Link from 'next/link'
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useGetAssignmentById } from '@/hooks/queries/useAssignments'
+import { UserAuth } from '@/contexts/AuthContext'
+import { useGetSubmissionsByStudentIdAndAssignmentId } from '@/hooks/queries/useSubmissions'
+
+
 
 export default function AssignmentPage({ params }: { params: { courseId: string, assignmentId: string } }) {
-  const [assignment, setAssignment] = useState<IAssignment | null>(null)
-  const [submissions, setSubmissions] = useState<ISubmission[]>([])
-  const [loading, setLoading] = useState(true)
-  const router = useRouter()
   const { toast } = useToast()
+  const user = UserAuth().user;
 
-  // Placeholder for the actual student ID
-  const studentId = '1'
+  const {
+    data: assignment,
+    isLoading: assignmentLoading,
+    error: assignmentError
+  } = useGetAssignmentById(params.assignmentId)
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true)
-      try {
-        const [assignmentResponse, submissionsResponse] = await Promise.all([
-          assignmentApi.getAssignmentById(params.assignmentId),
-          submissionApi.getSubmissionsByAssignmentAndStudent(params.assignmentId, studentId)
-        ])
+  const {
+    data: submissions = [], // Default to empty array
+    isLoading: submissionsLoading
+  } = useGetSubmissionsByStudentIdAndAssignmentId(user?._id?.toString() || '', params.assignmentId, {enabled: !!user?._id})
 
-        if (assignmentResponse.data) {
-          setAssignment(assignmentResponse.data)
-        } else {
-          throw new Error(assignmentResponse.error?.error || 'Failed to fetch assignment')
-        }
 
-        if (submissionsResponse.data) {
-          setSubmissions(submissionsResponse.data)
-        } else {
-          throw new Error(submissionsResponse.error?.error || 'Failed to fetch submissions')
-        }
-      } catch (err: any) {
-        toast({
-          title: "Error",
-          description: err.message,
-          variant: "destructive",
-        })
-        router.push(`/courses/${params.courseId}`)
-      } finally {
-        setLoading(false)
-      }
-    }
+  // Handle assignment loading error
+  if (assignmentError) {
+    toast({
+      title: "Error",
+      description: "Failed to load assignment details",
+      variant: "destructive",
+    })
+    return notFound()
+  }
 
-    fetchData()
-  }, [params.courseId, params.assignmentId, router, toast])
-
-  if (loading) {
+  // Loading state
+  if (assignmentLoading || submissionsLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -67,15 +49,16 @@ export default function AssignmentPage({ params }: { params: { courseId: string,
     )
   }
 
+  // Not found state
   if (!assignment) {
     return notFound()
   }
 
-  const getAssignmentStatus = (assignment: IAssignment, submissions: ISubmission[]) => {
+  const getAssignmentStatus = () => {
     const currentDate = new Date()
     const dueDate = new Date(assignment.dueDate)
     const allSubmitted = assignment.problems.every(problem => 
-      submissions.some(submission => submission.problemId === problem.id)
+      submissions.some(submission => submission.problemId === problem._id)
     )
 
     if (currentDate < dueDate) {
@@ -89,7 +72,8 @@ export default function AssignmentPage({ params }: { params: { courseId: string,
         color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-700 dark:text-yellow-200'
       }
     } else if (assignment.areGradesReleased) {
-      if (assignment.selfGradingEnabled && !allSubmitted) {
+      // need to work out the logic for determining if the self grading of an assignment is done or not
+      if (true && !allSubmitted) {
         return {
           status: "Need Self Grade",
           color: 'bg-blue-100 text-blue-800 dark:bg-blue-700 dark:text-blue-200'
@@ -102,36 +86,42 @@ export default function AssignmentPage({ params }: { params: { courseId: string,
       }
     }
 
-    // Default case (should not occur, but TypeScript requires it)
     return {
       status: "Unknown",
       color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
     }
   }
 
-  const { status, color } = getAssignmentStatus(assignment, submissions)
+  const { status, color } = getAssignmentStatus()
 
   return (
     <div className="space-y-6">
       <BackButton />
       <div>
         <h1 className="text-3xl font-bold">{assignment.title}</h1>
-        <p className="text-xl text-muted-foreground mt-2">Due: {new Date(assignment.dueDate).toLocaleDateString()}</p>
+        <p className="text-xl text-muted-foreground mt-2">
+          Due: {new Date(assignment.dueDate).toLocaleDateString()}
+        </p>
         <Badge className={color}>{status}</Badge>
       </div>
       <p className="text-lg">{assignment.description}</p>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {assignment.problems.map((problem, index) => {
-          const submission = submissions.find(s => s.problemId === problem.id)
+          const submission = submissions.find(s => s.problemId === problem._id)
           return (
-            <Link key={problem.id} href={`/courses/${params.courseId}/assignments/${params.assignmentId}/${problem.id}`}>
+            <Link 
+              key={problem._id.toString()} 
+              href={`/courses/${params.courseId}/assignments/${params.assignmentId}/${problem._id}`}
+            >
               <Card className="hover:shadow-md transition-shadow">
                 <CardHeader>
                   <CardTitle>Problem {index + 1}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="truncate">{problem.question}</p>
-                  <Badge className={submission ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                  <Badge 
+                    className={submission ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}
+                  >
                     {submission ? 'Submitted' : 'Not Submitted'}
                   </Badge>
                 </CardContent>
@@ -143,4 +133,3 @@ export default function AssignmentPage({ params }: { params: { courseId: string,
     </div>
   )
 }
-

@@ -50,26 +50,21 @@ return (
 }
 
 export default function ManageCoursesPage() {
-  const [newCourse, setNewCourse] = useState({ title: '', courseCode: '', description: '', instructor: '' })
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  // standard stuff
+  const user = UserAuth().user
   const { toast } = useToast()
   const router = useRouter()
 
-  const user = UserAuth().user
-  const {data: courses = [], isLoading, error} = useInstructingCourses(user?._id.toString() || '', {enabled: !!user?._id.toString()});
+  // hooks
+  const {data: courses = [], isLoading, error} = useInstructingCourses(user?._id?.toString() || '', {enabled: !!user?._id?.toString()});
   const {mutate: createCourse, isPending: creatingCourse, error: errorCreatingCourse} = useCreateCourse();
 
-  if (isLoading) {return <div>Loading...</div>}
-  if (errorCreatingCourse) {
-    toast({
-      title: "Something went wrong loading this course.",
-      description: errorCreatingCourse?.message || "Please try again later",
-      variant: "destructive"
-    })
-    router.push("/manage-courses")
-    return <div>There was an issue getting your course. {errorCreatingCourse?.message}</div>;
-  }
 
+  // States
+  const [newCourse, setNewCourse] = useState({ title: '', courseCode: '', description: '', instructor: '' })
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+
+  // hook wrappers
   const handleCreateCourse = async () => {
     if (newCourse.title && newCourse.courseCode) {
       createCourse(
@@ -95,6 +90,21 @@ export default function ManageCoursesPage() {
         }
       )
     }
+  }
+
+  // component specific functions
+  // - - NONE - - 
+
+  // loading & error states
+  if (isLoading) {return <div>Loading...</div>}
+  if (errorCreatingCourse) {
+    toast({
+      title: "Something went wrong loading this course.",
+      description: errorCreatingCourse?.message || "Please try again later",
+      variant: "destructive"
+    })
+    router.push("/manage-courses")
+    return <div>There was an issue getting your course. {errorCreatingCourse?.message}</div>;
   }
 
   return (

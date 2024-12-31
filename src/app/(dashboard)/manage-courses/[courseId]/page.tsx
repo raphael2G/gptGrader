@@ -13,6 +13,7 @@ import { useToast } from '@/components/ui/use-toast'
 export default function CourseManagementPage({ params }: { params: { courseId: string } }) {
   const router = useRouter()
   const { toast } = useToast();
+  
   const {data: course, isLoading: isGettingCourse, error: errorGettingCourse} = useGetCourseById(params.courseId)
 
   if (isGettingCourse ) return <div>Fetching course details...</div>

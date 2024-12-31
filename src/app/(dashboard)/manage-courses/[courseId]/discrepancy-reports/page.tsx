@@ -1,62 +1,53 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { BackButton } from '@/components/various/BackButton'
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
-import { assignmentApi } from '@/app/lib/client-api/assignments'
-import { discrepancyReportApi } from '@/app/lib/client-api/discrepancyReports'
-import { IAssignment } from '@@/models/Assignment'
 import { useToast } from "@/components/ui/use-toast"
 import { Loader2, AlertCircle, BarChart } from 'lucide-react'
 import Link from 'next/link'
 import { Badge } from "@/components/ui/badge"
-
-interface AssignmentWithReports extends IAssignment {
-  pendingReports: number;
-}
+import { useGetCourseById } from '@/hooks/queries/useCourses'
+import { useGetAssignmentsByArrayOfIds } from '@/hooks/queries/useAssignments'
+import { useGetDiscrepancyReportsByArrayOfAssignmentIds } from '@/hooks/queries/useDiscrepancyReports'
+import { IDiscrepancyReport } from '@/models/DiscrepancyReport'
 
 export default function DiscrepancyReportsPage({ params }: { params: { courseId: string } }) {
-  const [assignments, setAssignments] = useState<AssignmentWithReports[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const { toast } = useToast()
 
-  useEffect(() => {
-    const fetchAssignmentsAndReports = async () => {
-      setLoading(true)
-      try {
-        const assignmentsResponse = await assignmentApi.getAssignmentsByCourseId(params.courseId)
-        if (!assignmentsResponse.data) {
-          throw new Error(assignmentsResponse.error?.error || 'Failed to fetch assignments')
-        }
+  // 1. First get the course to get assignment IDs
+  const { 
+    data: course, 
+    isLoading: courseLoading, 
+    error: courseError 
+  } = useGetCourseById(params.courseId);
 
-        const assignmentsWithReports = await Promise.all(
-          assignmentsResponse.data.map(async (assignment) => {
-            const reportsResponse = await discrepancyReportApi.getDiscrepancyReportsByAssignment(assignment._id)
-            const pendingReports = reportsResponse.data?.filter(report => report.status === 'pending').length || 0
-            return { ...assignment, pendingReports }
-          })
-        )
+  // 2. Then get the assignments using the IDs from the course
+  const {
+    assignments = [],
+    isLoading: assignmentsLoading,
+    error: assignmentsError
+  } = useGetAssignmentsByArrayOfIds(
+    course?.assignments?.map(id => id.toString()) || [], 
+    { enabled: !!course?.assignments?.length }
+  );
 
-        setAssignments(assignmentsWithReports)
-      } catch (err) {
-        setError('Failed to fetch assignments and discrepancy reports')
-        toast({
-          title: "Error",
-          description: "Failed to load assignments and discrepancy reports. Please try again.",
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
-      }
-    }
+  // 3. Finally get all discrepancy reports for these assignments
+  const {
+    reports = {},
+    isLoading: reportsLoading,
+    error: reportsError,
+  } = useGetDiscrepancyReportsByArrayOfAssignmentIds(
+    assignments?.map(a => a._id.toString()) || [],
+    { enabled: !!assignments && assignments.length > 0 }
+  );
 
-    fetchAssignmentsAndReports()
-  }, [params.courseId, toast])
+  // Combine loading states
+  const isLoading = courseLoading || assignmentsLoading || reportsLoading;
 
-  if (loading) {
+  // Show loading state
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -64,23 +55,26 @@ export default function DiscrepancyReportsPage({ params }: { params: { courseId:
     )
   }
 
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen">
-        <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
-        <h1 className="text-2xl font-bold text-red-500 mb-4">Error</h1>
-        <p className="text-lg text-gray-600 dark:text-gray-400">{error}</p>
-        <BackButton />
-      </div>
-    )
+  // Handle errors
+  if (courseError || assignmentsError || reportsError) {
+    const errorMessage = 
+      (courseError?.message || "no course error ") + 
+      (assignmentsError?.message || "no assignment error ") +  
+      (reportsError?.message || "no reports error ");
+    
+    return <div>error message: {errorMessage} </div>;
   }
+
+  if (!course) {
+    return <div>no course</div>
+  }
+
 
   return (
     <div className="space-y-6">
       <BackButton />
       <h1 className="text-3xl font-bold">Discrepancy Reports</h1>
 
-      {/* Chart placeholder */}
       <Card className="w-full h-64">
         <CardHeader>
           <CardTitle>Discrepancy Reports Overview</CardTitle>
@@ -99,28 +93,37 @@ export default function DiscrepancyReportsPage({ params }: { params: { courseId:
         <p className="text-lg text-gray-600 dark:text-gray-400">No assignments found for this course.</p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {assignments.map((assignment) => (
-            <Link href={`/manage-courses/${params.courseId}/discrepancy-reports/${assignment._id}`} key={assignment._id}>
-              <Card className="hover:shadow-md transition-shadow cursor-pointer">
-                <CardHeader>
-                  <CardTitle className="text-lg">{assignment.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex justify-between items-center">
-                    <p className="text-sm text-muted-foreground">
-                      Due: {new Date(assignment.dueDate).toLocaleDateString()}
-                    </p>
-                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
-                      {assignment.pendingReports} pending
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
+          {assignments.map((assignment) => {
+            const assignmentId = assignment._id.toString();
+            const pendingCount = reports[assignmentId]?.filter((r: IDiscrepancyReport) => r.status == "pending").length;
+            return (
+              <Link 
+                href={`/manage-courses/${params.courseId}/discrepancy-reports/${assignmentId}`} 
+                key={assignmentId}
+              >
+                <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                  <CardHeader>
+                    <CardTitle className="text-lg">{assignment.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex justify-between items-center">
+                      <p className="text-sm text-muted-foreground">
+                        Due: {new Date(assignment.dueDate).toLocaleDateString()}
+                      </p>
+                      <Badge 
+                        variant="secondary" 
+                        className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100"
+                      >
+                        {pendingCount} pending
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>
   )
 }
-

@@ -1,29 +1,96 @@
 'use client'
 
-import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
-import { IProblem } from '@@/models/Assignment'
+import { IRubricItem } from '@/models/Assignment'
 import { Badge } from "@/components/ui/badge"
-import { discrepancyReportApi } from '@/app/lib/client-api/discrepancyReports';
-import { motion } from 'framer-motion';
+import { motion } from 'framer-motion'
 import { cn } from "@/lib/utils"
+import { useGetDiscrepancyReportsByAssignmentId } from '@/hooks/queries/useDiscrepancyReports'
+import { Loader2 } from "lucide-react"
+import { IDiscrepancyReport } from "@/models/DiscrepancyReport"
+import { Types } from "mongoose"
 
 interface RubricWithDiscrepancyIndicatorProps {
   assignmentId: string;
-  problem: IProblem;
+  problem: {
+    _id: Types.ObjectId;
+    rubric: {
+      items: IRubricItem[];
+    };
+  };
 }
 
-export function RubricWithDiscrepancyIndicator({ assignmentId, problem }: RubricWithDiscrepancyIndicatorProps) {
-  const [discrepancyStats, setDiscrepancyStats] = useState<Record<string, number>>({});
+// Helper function to calculate stats
+function calculateDiscrepancyStats(
+  problemId: string, 
+  rubricItems: IRubricItem[], 
+  discrepancyReports: IDiscrepancyReport[] | undefined
+): Record<string, number> {
+  const stats: Record<string, number> = {};
+  
+  // Initialize all rubric items with 0 disputes
+  rubricItems.forEach(item => {
+    stats[item._id.toString()] = 0;
+  });
 
-  useEffect(() => {
-    const fetchDiscrepancyStats = async () => {
-      const stats = await discrepancyReportApi.getDiscrepancyReportStatsByRubricItem(assignmentId, problem.id, problem.rubric);
-      setDiscrepancyStats(stats);
-    };
+  // If we have reports, count disputes for each rubric item
+  if (discrepancyReports) {
+    discrepancyReports
+      .filter(report => report.problemId.toString() === problemId)
+      .forEach(report => {
+        report.items.forEach(item => {
+          const itemId = item.rubricItemId.toString();
+          if (stats.hasOwnProperty(itemId)) {
+            stats[itemId]++;
+          }
+        });
+      });
+  }
 
-    fetchDiscrepancyStats();
-  }, [assignmentId, problem.id, problem.rubric]);
+  return stats;
+}
+
+export function RubricWithDiscrepancyIndicator({ 
+  assignmentId, 
+  problem 
+}: RubricWithDiscrepancyIndicatorProps) {
+  // hooks
+  const {
+    data: discrepancyReports,
+    isLoading,
+    error
+  } = useGetDiscrepancyReportsByAssignmentId(assignmentId);
+
+  // Calculate stats using the helper function
+  const discrepancyStats = calculateDiscrepancyStats(
+    problem._id.toString(),
+    problem.rubric.items,
+    discrepancyReports
+  );
+
+  // loading state
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center p-6">
+          <Loader2 className="h-6 w-6 animate-spin" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // error state
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <p className="text-sm text-muted-foreground">
+            Failed to load discrepancy data
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -31,12 +98,12 @@ export function RubricWithDiscrepancyIndicator({ assignmentId, problem }: Rubric
         <CardTitle>Rubric Items</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {problem.rubric.map((item) => {
+        {problem.rubric.items.map((item) => {
           const isPositive = item.points >= 0;
-          const disputeCount = discrepancyStats[item.id] || 0;
+          const disputeCount = discrepancyStats[item._id.toString()] || 0;
           
           return (
-            <div key={item.id} className="flex items-center gap-4">
+            <div key={item._id.toString()} className="flex items-center gap-4">
               <motion.div
                 className={cn(
                   "flex-grow flex items-center justify-between p-4 rounded-md transition-colors",
@@ -72,6 +139,5 @@ export function RubricWithDiscrepancyIndicator({ assignmentId, problem }: Rubric
         })}
       </CardContent>
     </Card>
-  )
+  );
 }
-

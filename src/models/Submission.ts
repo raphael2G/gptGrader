@@ -7,17 +7,19 @@ export type ISubmission = {
   studentId: mongoose.Types.ObjectId;
   answer: string;
   submittedAt: Date;
-  graded: boolean;
-  gradedBy?: mongoose.Types.ObjectId; // Reference to User
-  gradedAt?: Date;
-  appliedRubricItems?: mongoose.Types.ObjectId[]; // Reference to the RubricItems that are applied
-  feedback?: string;
 
   // self grading stuff
   selfGraded: boolean, // flag for if complete or not
-  selfGradedAppliedRubricItems: mongoose.Types.ObjectId[]; // Reference to self graded applied RubricItems
+  selfGradedScore?: number;
+  selfGradedAppliedRubricItems?: mongoose.Types.ObjectId[]; // Reference to self graded applied RubricItems
   selfGradingCompletedAt?: Date;
 
+  graded: boolean;
+  gradedScore?: number;
+  appliedRubricItems?: mongoose.Types.ObjectId[]; // Reference to the RubricItems that are applied
+  feedback?: string;
+  gradedBy?: mongoose.Types.ObjectId; // Reference to User
+  gradedAt?: Date;
 
   createdAt: Date;
   updatedAt: Date;
@@ -29,15 +31,17 @@ const submissionSchema = new Schema<ISubmission>({
   studentId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   answer: { type: String, required: true },
   submittedAt: { type: Date, required: true },
+
+  selfGraded: { type: Boolean, required: true, default: false},
+  selfGradedAppliedRubricItems: [{ type: Schema.Types.ObjectId, ref: 'Assignment.problems.rubric.items', required: false}],
+  selfGradingCompletedAt: { type: Date, required: false},
+
   graded: { type: Boolean, required: true },
   gradedBy: { type: Schema.Types.ObjectId, ref: 'User' },
   gradedAt: { type: Date },
   appliedRubricItems: [{ type: Schema.Types.ObjectId, ref: 'Assignment.problems.rubric.items' }],
-  feedback: { type: String },
+  feedback: { type: String }
 
-  selfGraded: { type: Boolean, required: false, default: false},
-  selfGradedAppliedRubricItems: [{ type: Schema.Types.ObjectId, ref: 'Assignment.problems.rubric.items' }],
-  selfGradingCompletedAt: { type: Date, required: false}
 
 }, {
   timestamps: true

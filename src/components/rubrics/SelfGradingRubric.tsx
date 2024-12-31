@@ -5,51 +5,64 @@ import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { IProblem } from '@@/models/Assignment';
-import { ISubmission } from '@@/models/Submission';
-import { submissionApi } from '@/app/lib/client-api/submissions';
+import { IProblem } from '@/models/Assignment';
+import { ISubmission } from '@/models/Submission';
+import { Types } from 'mongoose';
+import { useUpdateSubmissionSelfGrading } from '@/hooks/queries/useSubmissions';
+import { useToast } from '../ui/use-toast';
 
-interface SelfGradingSectionProps {
+
+interface SelfGradingRubricProps {
   problem: IProblem;
   submission: ISubmission;
-  onSelfGradingComplete: (updatedSubmission: ISubmission) => void;
 }
 
-export function SelfGradingRubric({ problem, submission, onSelfGradingComplete }: SelfGradingSectionProps) {
-  const [selections, setSelections] = useState<string[]>(submission.selfAssessedRubricItems?.map(i => i.rubricItemId) || []);
+export function SelfGradingRubric({ 
+  problem, 
+  submission, 
+}: SelfGradingRubricProps) {
 
-  const toggleRubricItem = (itemId: string) => {
+  const { toast } = useToast();
+  // Convert ObjectIds to strings for state management
+  const [selections, setSelections] = useState<Types.ObjectId[]>(
+    submission.selfGradedAppliedRubricItems || []
+  );
+
+  const { mutate: updateSelfGrading, isPending } = useUpdateSubmissionSelfGrading();
+
+  const toggleRubricItem = (itemId: Types.ObjectId) => {
     setSelections(prev => 
-      prev.includes(itemId) 
-        ? prev.filter(id => id !== itemId)
+      prev.some(id => id.toString() === itemId.toString())
+        ? prev.filter(id => !(id.toString() === itemId.toString()))
         : [...prev, itemId]
     );
   };
 
-  const calculatePoints = (selectedItems: string[]) => {
-    return problem.rubric.reduce((total, item) => 
-      total + (selectedItems.includes(item.id) ? item.points : 0), 0
+  const calculatePoints = (selectedItems: Types.ObjectId[]) => {
+    return problem.rubric.items.reduce((total, item) => 
+      total + (selectedItems.some(id => (id.toString() === item._id.toString())) ? item.points : 0), 
+      0
     );
   };
 
-  const handleSubmitSelfGrade = async () => {
-    try {
-      const updatedSubmission = await submissionApi.updateSubmission(submission._id!, {
-        selfAssessedRubricItems: selections.map(id => ({ rubricItemId: id })),
-        selfGraded: true,
-        selfGradingStatus: 'completed',
-        selfGradingCompletedAt: new Date(),
-      });
-
-      if (updatedSubmission.data) {
-        onSelfGradingComplete(updatedSubmission.data);
-      } else {
-        throw new Error(updatedSubmission.error?.error || 'Failed to update submission');
+  const handleSubmitSelfGrade = () => {
+    updateSelfGrading(
+      {
+        submissionId: submission._id!.toString(),
+        selfGradedAppliedRubricItems: selections.map(item=>item.toString())
+      },
+      {
+        onSuccess: (updatedSubmission) => {
+          toast({
+            title: "Nice! Your self grading has been submitted", 
+          })
+        },
+        onError: (error) => {
+          console.error('Failed to submit self-grade:', error);
+          // You might want to show an error toast here
+        }
       }
-    } catch (error: any) {
-      console.error('Failed to submit self-grade:', error);
-      // You might want to show an error toast here
-    }
+    );
   };
 
   return (
@@ -59,14 +72,14 @@ export function SelfGradingRubric({ problem, submission, onSelfGradingComplete }
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {problem.rubric.map((item) => {
-            const isSelected = selections.includes(item.id);
+          {problem.rubric.items.map((item) => {
+            const isSelected = selections.some(id => id.toString() === item._id.toString());
             const isPositive = item.points >= 0;
 
             return (
               <motion.div
-                key={item.id}
-                onClick={() => toggleRubricItem(item.id)}
+                key={item._id!.toString()}
+                onClick={() => toggleRubricItem(item._id!)}
                 className={cn(
                   "flex items-center p-4 rounded-md transition-colors cursor-pointer",
                   isSelected && isPositive && "bg-green-100 dark:bg-green-900/30 border-2 border-green-500",
@@ -100,6 +113,7 @@ export function SelfGradingRubric({ problem, submission, onSelfGradingComplete }
         <Button 
           className="w-full mt-4" 
           onClick={handleSubmitSelfGrade}
+          isLoading={isPending}
         >
           Submit Self-Grade
         </Button>
@@ -107,4 +121,3 @@ export function SelfGradingRubric({ problem, submission, onSelfGradingComplete }
     </Card>
   );
 }
-

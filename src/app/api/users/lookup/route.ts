@@ -4,6 +4,7 @@ import { findUserByFirebaseIdQuery } from '@/queries/userQueries';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
+  console.log(searchParams)
   const firebaseUid = searchParams.get('firebaseUid');
 
   if (!firebaseUid) {

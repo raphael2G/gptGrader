@@ -20,6 +20,31 @@ interface UserCoursesApiResponse {
 
 
 export const userApi = {
+
+ /**
+ * Fetches a user by their ID
+ * @param userid - The ID of the user to fetch
+ * @returns Promise containing either the course data or error message
+ * @throws Will throw an error if the course does not exist or there is a server issue
+ * @example
+ * const { data, error } = await courseApi.getCourseById("507f1f77bcf86cd799439011");
+ */
+  getUserById: async (userId: string): Promise<UserApiResponse> => {
+    try {
+      const data = await apiClient.get<any, IUser>(`/users/${userId}`);
+      return { data, error: undefined };
+    } catch (err) {
+      const error = err as { response?: { data: ApiError } };
+      return {
+        data: null,
+        error: error.response?.data || { error: 'Failed to fetch user' }
+      };
+    }
+  },
+  
+
+
+
   /**
    * Creates a new user or returns existing user if found
    * @param firebaseUid - The user's Firebase UID from authentication

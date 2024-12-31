@@ -1,35 +1,34 @@
-import { NextResponse } from 'next/server';
+// app/api/submissions/route.ts
+import { NextRequest, NextResponse } from 'next/server';
 import { Types } from 'mongoose';
 import { upsertSubmission } from '@/services/submissionServices';
 
-export async function POST(req: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const body = await req.json();
-    
-    // Validate required fields
-    const { assignmentId, problemId, studentId, answer } = body;
-    if (!assignmentId || !problemId || !studentId || !answer) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
-    }
+    const submissionData = await request.json();
 
-    // Convert string IDs to ObjectIds
-    const submissionData = {
-      assignmentId: new Types.ObjectId(assignmentId),
-      problemId: new Types.ObjectId(problemId),
-      studentId: new Types.ObjectId(studentId),
-      answer
+    // Convert string IDs to MongoDB ObjectIds
+    const data = {
+      ...submissionData,
+      assignmentId: new Types.ObjectId(submissionData.assignmentId),
+      problemId: new Types.ObjectId(submissionData.problemId),
+      studentId: new Types.ObjectId(submissionData.studentId),
+      gradedBy: submissionData.gradedBy ? new Types.ObjectId(submissionData.gradedBy) : undefined,
+      appliedRubricItems: submissionData.appliedRubricItems?.map(
+        (id: string) => new Types.ObjectId(id)
+      ),
+      selfGradedAppliedRubricItems: submissionData.selfGradedAppliedRubricItems?.map(
+        (id: string) => new Types.ObjectId(id)
+      ),
     };
 
-    const submission = await upsertSubmission(submissionData);
+  
 
+    const submission = await upsertSubmission(data);
     return NextResponse.json(submission);
   } catch (error) {
-    console.error('Failed to create/update submission:', error);
     return NextResponse.json(
-      { error: 'Failed to create/update submission' },
+      { error: `Failed to upsert submission: ${error instanceof Error ? error.message : 'Unknown error'}` },
       { status: 500 }
     );
   }

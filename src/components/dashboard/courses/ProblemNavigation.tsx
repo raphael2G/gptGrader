@@ -1,52 +1,52 @@
-'use client'
-
-import { useState, useEffect } from 'react'
-import { ChevronRight, ChevronLeft, Check, X } from 'lucide-react'
-import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { cn } from "@/lib/utils"
-import { IProblem } from '@@/models/Assignment'
-import { ISubmission } from '@@/models/Submission'
-import { submissionApi } from '@/app/lib/client-api/submissions'
-import { useToast } from "@/components/ui/use-toast"
+import { useState } from 'react';
+import { ChevronRight, ChevronLeft, Check, X } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
+import { useRouter, useParams } from 'next/navigation';
+import { useGetAssignmentById } from '@/hooks/queries/useAssignments';
+import { useGetSubmissionsByStudentIdAndAssignmentId } from '@/hooks/queries/useSubmissions';
 
 interface ProblemNavigationProps {
-  problems: IProblem[];
-  currentProblemId: string;
   assignmentId: string;
   studentId: string;
-  onProblemClick: (problemId: string) => void;
 }
 
-export function ProblemNavigation({ problems, currentProblemId, assignmentId, studentId, onProblemClick }: ProblemNavigationProps) {
+export function ProblemNavigation({ assignmentId, studentId }: ProblemNavigationProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [submissions, setSubmissions] = useState<ISubmission[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
+  const router = useRouter();
+  const params = useParams();
+  
+  // Extract current problem ID from URL
+  const currentProblemId = params.problemId as string;
 
-  useEffect(() => {
-    const fetchSubmissions = async () => {
-      setLoading(true);
-      try {
-        const response = await submissionApi.getSubmissionsByAssignmentAndStudent(assignmentId, studentId);
-        if (response.data) {
-          setSubmissions(response.data);
-        } else {
-          throw new Error(response.error?.error || 'Failed to fetch submissions');
-        }
-      } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to fetch submissions. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Extract courseId from URL
+  const courseId = params.courseId as string;
 
-    fetchSubmissions();
-  }, [assignmentId, studentId, toast]);
+  // Fetch assignment to get problems
+  const { data: assignment, isLoading: isLoadingAssignment } = useGetAssignmentById(assignmentId);
+
+  // Fetch submissions for the assignment
+  const { data: submissions, isLoading: isLoadingSubmissions } = useGetSubmissionsByStudentIdAndAssignmentId(
+    studentId,
+    assignmentId
+  );
+
+  const handleProblemClick = (newProblemId: string) => {
+    router.push(`/courses/${courseId}/assignments/${assignmentId}/${newProblemId}`);
+  };
+
+  if (isLoadingAssignment) {
+    return (
+      <div className="border rounded-lg shadow-sm w-12 h-full flex items-center justify-center">
+        <div className="animate-pulse w-4 h-4 rounded-full bg-gray-200" />
+      </div>
+    );
+  }
+
+  if (!assignment) {
+    return null;
+  }
 
   return (
     <div className={cn(
@@ -63,22 +63,24 @@ export function ProblemNavigation({ problems, currentProblemId, assignmentId, st
       </Button>
       <ScrollArea className="flex-grow">
         <div className="p-2 space-y-1">
-          {problems.map((problem) => {
-            const isCurrent = problem.id === currentProblemId;
-            const hasSubmission = submissions.some(s => s.problemId === problem.id);
+          {assignment.problems.map((problem, index) => {
+            const isCurrent = problem._id?.toString() === currentProblemId;
+            const hasSubmission = submissions?.some(s => 
+              s.problemId.toString() === problem._id?.toString()
+            );
 
             return (
               <Button
-                key={problem.id}
+                key={problem._id?.toString()}
                 variant="ghost"
                 className={cn(
                   "w-full p-1 flex items-center justify-center",
                   isCurrent && "bg-accent text-accent-foreground"
                 )}
-                onClick={() => onProblemClick(problem.id)}
+                onClick={() => handleProblemClick(problem._id?.toString() || '')}
               >
-                <span>Q{problems.findIndex(p => p.id === problem.id) + 1}</span>
-                {isExpanded && !loading && (
+                <span>Q{index + 1}</span>
+                {isExpanded && !isLoadingSubmissions && (
                   hasSubmission ? (
                     <Check className="ml-2 h-4 w-4 text-green-500" />
                   ) : (
@@ -93,4 +95,3 @@ export function ProblemNavigation({ problems, currentProblemId, assignmentId, st
     </div>
   );
 }
-

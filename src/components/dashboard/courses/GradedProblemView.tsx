@@ -1,22 +1,23 @@
-import { useState, useEffect } from 'react';
+'use client'
+
 import { useRouter } from 'next/navigation';
-import { Loader2, Check, X, Circle } from 'lucide-react';
-import { assignmentApi } from '@/app/lib/client-api/assignments';
-import { submissionApi } from '@/app/lib/client-api/submissions';
-import { IAssignment, IProblem } from '@@/models/Assignment';
-import { ISubmission } from '@@/models/Submission';
+import { Loader2 } from 'lucide-react';
 import { useToast } from "@/components/ui/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { ProblemNavigation } from './ProblemNavigation';
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
+import { motion } from "framer-motion";
 import { CombinedRubricSection } from '@/components/rubrics/CombinedRubricSection';
-import { SelfGradingRubric } from '@/components/rubrics/SelfGradingRubric'
+import { SelfGradingRubric } from '@/components/rubrics/SelfGradingRubric';
+import { useGetAssignmentById } from '@/hooks/queries/useAssignments';
+import { IAssignment } from '@/models/Assignment';
+import { ISubmission } from '@/models/Submission';
+import { UserAuth } from '@/contexts/AuthContext';
+import { useGetSubmissionsByStudentIdAssignmentIdAndProblemId } from '@/hooks/queries/useSubmissions';
+
+
 
 interface GradedProblemViewProps {
   courseId: string;
@@ -25,117 +26,29 @@ interface GradedProblemViewProps {
 }
 
 export function GradedProblemView({ courseId, assignmentId, problemId }: GradedProblemViewProps) {
-  const [assignment, setAssignment] = useState<IAssignment | null>(null);
-  const [problem, setProblem] = useState<IProblem | null>(null);
-  const [submission, setSubmission] = useState<ISubmission | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [selfGradeSelections, setSelfGradeSelections] = useState<string[]>([]);
   const { toast } = useToast();
   const router = useRouter();
+  const user = UserAuth().user;
 
-  const studentId = '1';
+  // React Query hooks
+  const {
+    data: assignment,
+    isLoading: assignmentLoading,
+    error: assignmentError
+  } = useGetAssignmentById(assignmentId);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const [assignmentResponse, submissionResponse] = await Promise.all([
-          assignmentApi.getAssignmentById(assignmentId),
-          submissionApi.getSubmissionByAssignmentProblemAndStudent(assignmentId, problemId, studentId)
-        ]);
+  const {
+    data: submission,
+    isLoading: submissionLoading,
+    error: submissionError
+  } = useGetSubmissionsByStudentIdAssignmentIdAndProblemId(user?._id.toString() || '', assignmentId, problemId, {enabled: !!user}, );
 
-        if (assignmentResponse.data) {
-          setAssignment(assignmentResponse.data);
-          const foundProblem = assignmentResponse.data.problems.find(p => p.id === problemId);
-          if (foundProblem) {
-            setProblem(foundProblem);
-          }
-        }
+  if (!user) {
+    return <div>loading user...</div>
+  }
 
-        if (submissionResponse.data) {
-          setSubmission(submissionResponse.data);
-          setSelfGradeSelections(submissionResponse.data.selfAssessedRubricItems?.map(item => item.rubricItemId) || []);
-        }
-      } catch (error: any) {
-        toast({
-          title: 'Error',
-          description: error.message,
-          variant: 'destructive'
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [assignmentId, problemId, toast]);
-
-  const handleProblemNavigation = (newProblemId: string) => {
-    router.push(`/courses/${courseId}/assignments/${assignmentId}/${newProblemId}`);
-  };
-
-  const toggleRubricItem = (itemId: string) => {
-    if (submission?.selfGraded) return;
-    setSelfGradeSelections(prev => 
-      prev.includes(itemId)
-        ? prev.filter(id => id !== itemId)
-        : [...prev, itemId]
-    );
-  };
-
-  const calculatePoints = (selectedItems: string[]) => {
-    if (!problem) return 0;
-    return problem.rubric.reduce((total, item) => 
-      total + (selectedItems.includes(item.id) ? item.points : 0), 0
-    );
-  };
-
-  const handleSubmitSelfGrade = async () => {
-    if (!submission || !problem) return;
-
-    try {
-      const updateData = {
-        selfGraded: true,
-        selfGradingStatus: 'completed',
-        selfGradingCompletedAt: new Date(),
-        selfAssessedRubricItems: problem.rubric
-          .filter(item => selfGradeSelections.includes(item.id))
-          .map(item => ({
-            rubricItemId: item.id,
-            comment: '',
-          })),
-      };
-
-      const response = await submissionApi.updateSubmission(submission._id!, updateData);
-
-      if (response.data) {
-        setSubmission(response.data);
-        toast({
-          title: 'Self Grade Submitted',
-          description: 'Your self-grade has been submitted.',
-        });
-      } else {
-        throw new Error(response.error?.error || 'Failed to submit self-grade');
-      }
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleSelfGradingComplete = (updatedSubmission: ISubmission) => {
-    setSubmission(updatedSubmission);
-    toast({
-      title: 'Success',
-      description: 'Self-grading submitted successfully.',
-    });
-  };
-
-
-  if (loading || !assignment || !problem) {
+  // Handle loading states
+  if (assignmentLoading || submissionLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -143,82 +56,28 @@ export function GradedProblemView({ courseId, assignmentId, problemId }: GradedP
     );
   }
 
-  const gradedPoints = calculatePoints(submission?.appliedRubricItemIds || []);
-  const selfGradedPoints = calculatePoints(selfGradeSelections);
+  // Handle errors
+  if (assignmentError || submissionError) {
+    return null;
+  }
 
-  const RubricSection = ({ 
-    selections, 
-    isEditable = false, 
-    title = "Rubric",
-    showSubmit = false 
-  }) => (
-    <Card className="w-1/3">
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {problem.rubric.map((item) => {
-            const isSelected = selections.includes(item.id);
-            const isPositive = item.points >= 0;
+  // If no assignment or problem found
+  if (!assignment) return null;
+  const problem = assignment.problems.find(p => p._id.toString() === problemId);
+  if (!problem) return null;
+  if (!submission) return null;
 
-            return (
-              <motion.div
-                key={item.id}
-                onClick={() => isEditable && toggleRubricItem(item.id)}
-                className={cn(
-                  "flex items-center p-4 rounded-md transition-colors",
-                  isEditable && "cursor-pointer",
-                  isSelected && isPositive && "bg-green-100 dark:bg-green-900/30 border-2 border-green-500",
-                  isSelected && !isPositive && "bg-red-100 dark:bg-red-900/30 border-2 border-red-500",
-                  !isSelected && "bg-muted hover:bg-muted/80 dark:hover:bg-muted/50"
-                )}
-                whileHover={isEditable ? { scale: 1.02 } : {}}
-                whileTap={isEditable ? { scale: 0.98 } : {}}
-              >
-                <span className="flex-grow text-sm">
-                  {item.description}
-                </span>
-                <span className={cn(
-                  "font-semibold text-sm",
-                  isPositive ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"
-                )}>
-                  {item.points > 0 ? '+' : ''}{item.points}
-                </span>
-              </motion.div>
-            );
-          })}
-        </div>
-        
-        <div className="mt-6 p-4 bg-muted rounded-lg">
-          <div className="text-lg font-semibold flex justify-between items-center">
-            <span>Total Score:</span>
-            <span>{calculatePoints(selections)} / {problem.maxPoints}</span>
-          </div>
-        </div>
-
-        {showSubmit && (
-          <Button 
-            className="w-full mt-4" 
-            onClick={handleSubmitSelfGrade}
-          >
-            Submit Self-Grade
-          </Button>
-        )}
-      </CardContent>
-    </Card>
-  );
+  const handleProblemNavigation = (newProblemId: string) => {
+    router.push(`/courses/${courseId}/assignments/${assignmentId}/${newProblemId}`);
+  };
 
 
 
   return (
     <div className="flex gap-6">
       <ProblemNavigation
-        problems={assignment.problems}
-        currentProblemId={problemId}
         assignmentId={assignmentId}
-        studentId={studentId}
-        onProblemClick={handleProblemNavigation}
+        studentId={user._id.toString()}
       />
       
       <div className="flex-grow space-y-6 w-2/3">
@@ -232,7 +91,7 @@ export function GradedProblemView({ courseId, assignmentId, problemId }: GradedP
           <Card className="w-2/3">
             <CardHeader>
               <CardTitle>
-                Problem {assignment.problems.findIndex(p => p.id === problem.id) + 1}
+                Problem {assignment.problems.findIndex(p => p._id.toString() === problemId) + 1}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -250,13 +109,12 @@ export function GradedProblemView({ courseId, assignmentId, problemId }: GradedP
               <CombinedRubricSection
                 assignmentId={assignmentId}
                 problemId={problemId}
-                studentId={studentId}
+                studentId={user._id.toString()}
               />
             ) : (
               <SelfGradingRubric
                 problem={problem}
                 submission={submission}
-                onSelfGradingComplete={handleSelfGradingComplete}
               />
             )
           ) : (
@@ -276,4 +134,3 @@ export function GradedProblemView({ courseId, assignmentId, problemId }: GradedP
     </div>
   );
 }
-

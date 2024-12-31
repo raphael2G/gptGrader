@@ -1,14 +1,11 @@
-'use client';
+'use client'
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
-import { assignmentApi } from '@/app/lib/client-api/assignments';
-import { submissionApi } from '@/app/lib/client-api/submissions';
-import { IAssignment, IProblem } from '@@/models/Assignment';
-import { ISubmission } from '@@/models/Submission';
-import { useToast } from "@/components/ui/use-toast";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { cn } from '@/lib/utils'
+import { Loader2 } from 'lucide-react'
+import { useToast } from "@/components/ui/use-toast"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
@@ -19,169 +16,176 @@ import {
   DialogTitle,
   DialogDescription
 } from "@/components/ui/dialog"
-import Link from 'next/link';
-import { ProblemNavigation } from './ProblemNavigation';
+import Link from 'next/link'
+import { ProblemNavigation } from './ProblemNavigation'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { useGetAssignmentById } from '@/hooks/queries/useAssignments'
+import { useUpsertSubmission } from '@/hooks/queries/useSubmissions'
+import { useGetSubmissionsByStudentIdAssignmentIdAndProblemId } from '@/hooks/queries/useSubmissions'
+import { UserAuth } from '@/contexts/AuthContext'
+
+
 
 interface ProblemViewProps {
-  courseId: string;
-  assignmentId: string;
-  problemId: string;
+  courseId: string
+  assignmentId: string
+  problemId: string
 }
 
 export function ProblemView({ courseId, assignmentId, problemId }: ProblemViewProps) {
-  const [assignment, setAssignment] = useState<IAssignment | null>(null);
-  const [problem, setProblem] = useState<IProblem | null>(null);
-  const [submission, setSubmission] = useState<ISubmission | null>(null);
-  const [answer, setAnswer] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [lastSubmissionDialogOpen, setLastSubmissionDialogOpen] = useState(false);
-  const [lastSubmission, setLastSubmission] = useState<ISubmission | null>(null);
-  const { toast } = useToast();
-  const router = useRouter();
+  const user = UserAuth().user;
 
-  // Placeholder for the actual student ID
-  const studentId = '1';
+  
+  // Hooks
+  const router = useRouter()
+  const { toast } = useToast()
 
+  // Queries
+  const {
+    data: assignment,
+    isLoading: assignmentLoading,
+    error: assignmentError
+  } = useGetAssignmentById(assignmentId)
+
+  const {
+    data: submission,
+    isLoading: submissionLoading,
+    error: submissionError
+  } = useGetSubmissionsByStudentIdAssignmentIdAndProblemId(user?._id.toString() || "", assignmentId, problemId, {enabled: !!user?._id})
+
+  // Mutations
+  const { 
+    mutate: upsertSubmission,
+    isPending: isSubmitting 
+  } = useUpsertSubmission()
+
+  // State
+  const [lastSubmissionDialogOpen, setLastSubmissionDialogOpen] = useState(false)
+
+  // we want the answer to initially be set to the last submission, but only if the answer is empty and has not been initialized yet
+  const [answer, setAnswer] = useState(submission?.answer || '')
+  const [isInitialized, setIsInitialized] = useState(false)
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const assignmentResponse = await assignmentApi.getAssignmentById(assignmentId);
-        if (!assignmentResponse.data) {
-          throw new Error('Assignment not found');
-        }
-        setAssignment(assignmentResponse.data);
-        console.log(assignmentResponse)
+    if (submission && !isInitialized) {
+      setAnswer(submission.answer)
+      setIsInitialized(true)
+    }
+  }, [submission, submissionLoading])
 
-        const foundProblem = assignmentResponse.data.problems.find(p => p.id === 'problem1');
-        if (!foundProblem) {
-          throw new Error('Problem not found');
-        }
-        setProblem(foundProblem);
+  // Derived state
+  const isLoading = assignmentLoading || submissionLoading
+  const error = assignmentError || submissionError
+  const currentDate = new Date()
+  const dueDate = assignment?.dueDate ? new Date(assignment.dueDate) : null
+  const isPastDue = dueDate ? currentDate > dueDate : false
 
-        const submissionResponse = await submissionApi.getSubmissionByAssignmentProblemAndStudent(
-          assignmentId,
-          problemId,
-          studentId
-        );
-        setSubmission(submissionResponse.data);
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
 
-        if (submissionResponse.data) {
-          setAnswer(submissionResponse.data.answer);
-          setLastSubmission(submissionResponse.data);
-        }
-      } catch (error: any) {
-        toast({
-          title: 'Error',
-          description: error.message,
-          variant: 'destructive'
-        });
-      } finally {
-        setLoading(false);
+  // Error state
+  if (error || !assignment) {
+    toast({
+      title: 'Error',
+      description: 'Failed to load problem details',
+      variant: 'destructive'
+    })
+    return null
+  }
+
+  // Find current problem
+  const problem = assignment.problems.find(p => p._id.toString() === problemId)
+  if (!problem) return null
+
+  // Get assignment status
+  const getAssignmentStatus = () => {
+    if (currentDate < dueDate!) {
+      return {
+        status: "Accepting Submissions",
+        color: 'bg-green-100 text-green-800 dark:bg-green-700 dark:text-green-200'
       }
-    };
+    } 
+    if (!assignment.areGradesReleased) {
+      return {
+        status: "Not Graded",
+        color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-700 dark:text-yellow-200'
+      }
+    }
+    if (assignment.selfGradingEnabled && !submission?.selfGraded) {
+      return {
+        status: "Need Self Grade",
+        color: 'bg-blue-100 text-blue-800 dark:bg-blue-700 dark:text-blue-200'
+      }
+    }
+    return {
+      status: "Graded",
+      color: 'bg-purple-100 text-purple-800 dark:bg-purple-700 dark:text-purple-200'
+    }
+  }
 
-    fetchData();
-  }, [assignmentId, problemId, toast]);
+  const { status, color } = getAssignmentStatus()
 
+  // Handlers
   const handleSubmit = async () => {
     try {
-      if (!submission) {
-        const newSubmission = await submissionApi.createSubmission(assignmentId, studentId, [{ problemId, answer }]);
-        if (newSubmission.data) {
-          setSubmission(newSubmission.data);
-          toast({
-            title: 'Submission Created',
-            description: 'Your submission has been created.',
-          });
-        } else {
-          throw new Error('Failed to create submission');
-        }
-      } else {
-        const updatedSubmission = await submissionApi.updateSubmission(submission._id!, { answer });
-        if (updatedSubmission.data) {
-          setSubmission(updatedSubmission.data);
-          toast({
-            title: 'Submission Updated',
-            description: 'Your submission has been updated.',
-          });
-        } else {
-          throw new Error('Failed to update submission');
-        }
-      }
+
+      await upsertSubmission({
+        studentId: user?._id?.toString() || "",
+        assignmentId,
+        problemId,
+        answer
+      })
+
+      
+      toast({
+        title: submission ? 'Submission Updated' : 'Submission Created',
+        description: `Your submission has been ${submission ? 'updated' : 'created'}.`,
+      })
     } catch (error: any) {
       toast({
         title: 'Error',
         description: error.message,
         variant: 'destructive'
-      });
-    }
-  };
-
-  const handleProblemNavigation = (newProblemId: string) => {
-    router.push(`/courses/${courseId}/assignments/${assignmentId}/${newProblemId}`);
-  };
-
-  if (loading || !assignment || !problem) {
-
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  const currentDate = new Date();
-  const dueDate = new Date(assignment.dueDate);
-  const isPastDue = currentDate > dueDate;
-
-  let status: string;
-  let statusColor: string;
-
-  if (currentDate < dueDate) {
-    status = "Accepting Submissions";
-    statusColor = 'bg-green-100 text-green-800 dark:bg-green-700 dark:text-green-200';
-  } else if (currentDate >= dueDate && !assignment.areGradesReleased) {
-    status = "Not Graded";
-    statusColor = 'bg-yellow-100 text-yellow-800 dark:bg-yellow-700 dark:text-yellow-200';
-  } else if (assignment.areGradesReleased) {
-    if (assignment.selfGradingEnabled && !submission?.selfGraded) {
-      status = "Need Self Grade";
-      statusColor = 'bg-blue-100 text-blue-800 dark:bg-blue-700 dark:text-blue-200';
-    } else {
-      status = "Graded";
-      statusColor = 'bg-purple-100 text-purple-800 dark:bg-purple-700 dark:text-purple-200';
+      })
     }
   }
 
   return (
     <div className="flex gap-6">
+      {/* Problem Navigation */}
       <ProblemNavigation
-        problems={assignment.problems}
-        currentProblemId={problemId}
         assignmentId={assignmentId}
-        studentId={studentId}
-        onProblemClick={handleProblemNavigation}
+        studentId={user?._id.toString() || ""}
       />
+
+      {/* Main Content */}
       <div className="flex-grow space-y-6">
+        {/* Assignment Header */}
         <div className="space-y-2">
           <h1 className="text-3xl font-bold">{assignment.title}</h1>
-          <p className="text-xl">Due: {new Date(assignment.dueDate).toLocaleDateString()}</p>
+          <p className="text-xl">Due: {dueDate?.toLocaleDateString()}</p>
           <p className="text-lg">{assignment.description}</p>
         </div>
 
+        {/* Problem Card */}
         <Card>
           <CardHeader>
             <CardTitle>
-              Problem {assignment.problems.findIndex(p => p.id === problem.id) + 1}
+              Problem {assignment.problems.findIndex(p => p._id.toString() === problemId) + 1}
             </CardTitle>
             <div className="flex gap-2">
-              <Badge className={statusColor}>{status}</Badge>
+              <Badge className={color}>{status}</Badge>
             </div>
           </CardHeader>
           <CardContent>
             <p className="text-lg font-semibold mb-4">{problem.question}</p>
+            
+            {/* Answer Input */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -190,9 +194,10 @@ export function ProblemView({ courseId, assignmentId, problemId }: ProblemViewPr
                       placeholder={isPastDue ? "Submission closed" : "Enter your answer here..."}
                       value={answer}
                       onChange={(e) => setAnswer(e.target.value)}
-                      className={`w-full min-h-[200px] border-2 border-gray-200 dark:border-gray-700 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                        isPastDue ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed' : ''
-                      }`}
+                      className={cn(
+                        "w-full min-h-[200px] border-2 border-gray-200 dark:border-gray-700 rounded-md p-2",
+                        isPastDue && "bg-gray-100 dark:bg-gray-800 cursor-not-allowed"
+                      )}
                       disabled={isPastDue}
                     />
                   </div>
@@ -205,23 +210,30 @@ export function ProblemView({ courseId, assignmentId, problemId }: ProblemViewPr
               </Tooltip>
             </TooltipProvider>
           </CardContent>
+
+          {/* Actions */}
           <CardContent className="pt-0">
             <div className="flex justify-center items-center space-x-4 mt-2">
               <Link
                 href="#"
                 onClick={(e) => {
-                  e.preventDefault();
-                  setLastSubmissionDialogOpen(true);
+                  e.preventDefault()
+                  setLastSubmissionDialogOpen(true)
                 }}
                 className="text-sm text-muted-foreground hover:underline focus:underline"
               >
                 View Last Submission
               </Link>
+              
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span>
-                      <Button onClick={handleSubmit} disabled={isPastDue}>
+                      <Button
+                        onClick={handleSubmit}
+                        disabled={isPastDue}
+                        isLoading={isSubmitting}
+                      >
                         {isPastDue ? "Submission Closed" : "Submit"}
                       </Button>
                     </span>
@@ -237,18 +249,19 @@ export function ProblemView({ courseId, assignmentId, problemId }: ProblemViewPr
           </CardContent>
         </Card>
 
+        {/* Last Submission Dialog */}
         <Dialog open={lastSubmissionDialogOpen} onOpenChange={setLastSubmissionDialogOpen}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Last Submission</DialogTitle>
-              {lastSubmission && (
+              {submission && (
                 <DialogDescription>
-                  Submitted at: {new Date(lastSubmission.submittedAt).toLocaleString()}
+                  Submitted at: {new Date(submission.submittedAt).toLocaleString()}
                 </DialogDescription>
               )}
             </DialogHeader>
             <Textarea
-              value={lastSubmission?.answer || 'No previous submission found.'}
+              value={submission?.answer || 'No previous submission found.'}
               readOnly
               className="w-full h-64 mt-4"
             />
@@ -256,6 +269,5 @@ export function ProblemView({ courseId, assignmentId, problemId }: ProblemViewPr
         </Dialog>
       </div>
     </div>
-  );
+  )
 }
-

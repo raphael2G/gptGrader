@@ -1,5 +1,7 @@
 import mongoose, { Schema } from 'mongoose';
 
+
+
 export type IDiscrepancyItem = {
   _id: mongoose.Types.ObjectId;
   submissionId: mongoose.Types.ObjectId;
@@ -15,7 +17,7 @@ export type IDiscrepancyItem = {
 
   resolution? : {
     shouldItemBeApplied: boolean;
-    explanation: boolean;
+    explanation: string;
     resolvedBy: mongoose.Types.ObjectId; // reference to a user, {type: Schema.Types.ObjectId, ref: 'User'}
     resolvedAt: Date;
   }
@@ -53,13 +55,14 @@ const discrepancyItemSchema = new Schema<IDiscrepancyItem>({
 
   resolution: {
     type: {
-      shouldItemBeApplied: { type: Boolean, required: true },
-      explanation: { type: Boolean, required: true },
-      resolvedBy: { type: Schema.Types.ObjectId, required: true, ref: 'User' },
-      resolvedAt: { type: Date, required: true }
+      shouldItemBeApplied: { type: Boolean },
+      explanation: { type: String },  
+      resolvedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+      resolvedAt: { type: Date }
     },
     required: false
   }
+  
 }, {
   timestamps: true
 });

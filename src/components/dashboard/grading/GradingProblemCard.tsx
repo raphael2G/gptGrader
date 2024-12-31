@@ -1,7 +1,7 @@
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { IProblem } from '@@/models/Assignment'
-import { ISubmission } from '@@/models/Submission'
+import { IProblem } from '@/models/Assignment'
+import { ISubmission } from '@/models/Submission'
 
 interface ProblemCardProps {
   problem: IProblem;
@@ -15,7 +15,7 @@ export function GradingProblemCard({ problem, questionNumber, submissions }: Pro
   const gradedPercentage = totalSubmissions > 0 ? (gradedSubmissions / totalSubmissions) * 100 : 0;
 
   const getRubricStatus = () => {
-    if (problem.rubric.length === 0) return 'empty';
+    if (problem.rubric.items.length === 0) return 'empty';
     if (problem.rubricFinalized) return 'finalized';
     return 'not-finalized';
   }

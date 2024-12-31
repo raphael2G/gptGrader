@@ -14,26 +14,26 @@ interface CourseApiResponse {
 
 export const courseApi = {
 
-    /**
-   * Fetches a course by its ID
-   * @param courseId - The ID of the course to fetch
-   * @returns Promise containing either the course data or error message
-   * @throws Will throw an error if the course does not exist or there is a server issue
-   * @example
-   * const { data, error } = await courseApi.getCourseById("507f1f77bcf86cd799439011");
-   */
-    getCourseById: async (courseId: string): Promise<CourseApiResponse> => {
-      try {
-        const data = await apiClient.get<any, ICourse>(`/courses/${courseId}`);
-        return { data, error: undefined };
-      } catch (err) {
-        const error = err as { response?: { data: ApiError } };
-        return {
-          data: null,
-          error: error.response?.data || { error: 'Failed to fetch course' }
-        };
-      }
-    },
+  /**
+ * Fetches a course by its ID
+ * @param courseId - The ID of the course to fetch
+ * @returns Promise containing either the course data or error message
+ * @throws Will throw an error if the course does not exist or there is a server issue
+ * @example
+ * const { data, error } = await courseApi.getCourseById("507f1f77bcf86cd799439011");
+ */
+  getCourseById: async (courseId: string): Promise<CourseApiResponse> => {
+    try {
+      const data = await apiClient.get<any, ICourse>(`/courses/${courseId}`);
+      return { data, error: undefined };
+    } catch (err) {
+      const error = err as { response?: { data: ApiError } };
+      return {
+        data: null,
+        error: error.response?.data || { error: 'Failed to fetch course' }
+      };
+    }
+  },
 
   /**
    * Creates a new course and automatically adds the creator as an instructor
@@ -105,7 +105,6 @@ export const courseApi = {
       };
     }
   },
-
 
 
   /**

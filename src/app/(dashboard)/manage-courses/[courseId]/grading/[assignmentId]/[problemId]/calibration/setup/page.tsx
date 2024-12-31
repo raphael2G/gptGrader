@@ -1,9 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { submissionApi } from '@/app/lib/client-api/submissions';
-import { ISubmission } from '@@/models/Submission';
+import { useGetSubmissionsByProblemId } from '@/hooks/queries/useSubmissions';
 import { useToast } from "@/components/ui/use-toast";
 import { BackButton } from '@/components/various/BackButton';
 import {
@@ -15,38 +13,25 @@ import {
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Loader2 } from "lucide-react";
+import { useState } from 'react';
 
 export default function CalibrationSetupPage({ params }: { params: { courseId: string, assignmentId: string, problemId: string } }) {
-  const [submissions, setSubmissions] = useState<ISubmission[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [numCalibrations, setNumCalibrations] = useState<number>(1);
+  // Standard stuff
   const router = useRouter();
   const { toast } = useToast();
 
-  useEffect(() => {
-    const fetchSubmissions = async () => {
-      setLoading(true);
-      try {
-        const response = await submissionApi.getSubmissionsByProblemId(params.problemId);
-        if (response.data) {
-          setSubmissions(response.data);
-        } else {
-          throw new Error(response.error?.error || 'Failed to fetch submissions');
-        }
-      } catch (err) {
-        toast({
-          title: "Error",
-          description: "Failed to fetch submissions. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Hooks
+  const { 
+    data: submissions = [], 
+    isLoading,
+    error 
+  } = useGetSubmissionsByProblemId(params.problemId);
 
-    fetchSubmissions();
-  }, [params.problemId, toast]);
+  // States
+  const [numCalibrations, setNumCalibrations] = useState<number>(1);
 
+  // Component specific functions
   const handleNumCalibrationsChange = (value: string) => {
     setNumCalibrations(parseInt(value));
   };
@@ -55,8 +40,23 @@ export default function CalibrationSetupPage({ params }: { params: { courseId: s
     router.push(`/manage-courses/${params.courseId}/grading/${params.assignmentId}/${params.problemId}/calibration?n=${numCalibrations}`);
   };
 
-  if (loading) {
-    return <div>Loading submissions...</div>;
+  // Loading & error states
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error || !submissions) {
+    toast({
+      title: "Error",
+      description: error?.message || "Failed to fetch submissions. Please try again.",
+      variant: "destructive",
+    });
+    router.back();
+    return null;
   }
 
   const calibrationOptions = [1, 5, 10, 20];
@@ -93,4 +93,3 @@ export default function CalibrationSetupPage({ params }: { params: { courseId: s
     </div>
   );
 }
-

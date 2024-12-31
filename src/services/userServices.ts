@@ -1,5 +1,19 @@
 import { Types } from 'mongoose';
-import { findUserByFirebaseIdQuery, createUserQuery, findUserCoursesQuery } from '@/queries/userQueries';
+import { findUserByFirebaseIdQuery, createUserQuery, findUserCoursesQuery, getUserByIdQuery } from '@/queries/userQueries';
+
+
+
+export async function getUserById(userId: Types.ObjectId) {
+  try {
+    const user = await getUserByIdQuery(userId);
+    return user
+  } catch (error) {
+    throw new Error(`Failed to get course: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+
+
 
 interface CreateUserData {
   firebaseUid: string;

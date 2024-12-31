@@ -1,98 +1,82 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { BackButton } from '@/components/various/BackButton'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { assignmentApi } from '@/app/lib/client-api/assignments'
-import { submissionApi } from '@/app/lib/client-api/submissions'
-import { userApi } from '@/app/lib/client-api/users'
-import { IAssignment, IProblem } from '@@/models/Assignment'
-import { ISubmission } from '@@/models/Submission'
-import { IUser } from '@@/models/User'
+import { IAssignment, IProblem } from '@/models/Assignment'
 import { useToast } from "@/components/ui/use-toast"
-import { ProblemNavigation } from '@/components/dashboard/courses/ProblemNavigation'
-import { Textarea } from "@/components/ui/textarea"
-import { ProfessorDisputeReviewSection } from '@/components/rubrics/ProfessorDisputeReviewSection'
 import { NavigationBar } from '@/components/dashboard/reviewingSubmissions/NavigationBar'
-import { cn } from "@/lib/utils"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Button } from '@/components/ui/button'
 import { Loader2, ChevronDown, ChevronUp } from 'lucide-react'
+import { ProfessorDisputeReviewSection } from '@/components/rubrics/ProfessorDisputeReviewSection'
 
+// Import our React Query hooks
+import { useGetAssignmentById } from '@/hooks/queries/useAssignments'
+import { 
+  useGetSubmissionsByStudentIdAssignmentIdAndProblemId,
+  useGetSubmissionsByAssignmentId 
+} from '@/hooks/queries/useSubmissions'
+import { useGetUserById } from '@/hooks/queries/useUsers'
+import { UserAuth } from '@/contexts/AuthContext'
 
 export default function DiscrepancyReportPage({ 
   params 
 }: { 
   params: { courseId: string, assignmentId: string, problemId: string, submissionId: string } 
 }) {
-  const [assignment, setAssignment] = useState<IAssignment | null>(null)
-  const [problem, setProblem] = useState<IProblem | null>(null)
-  const [submission, setSubmission] = useState<ISubmission | null>(null)
-  const [student, setStudent] = useState<IUser | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [totalSubmissions, setTotalSubmissions] = useState(0)
-  const [currentSubmissionIndex, setCurrentSubmissionIndex] = useState(0)
-  const [adjacentSubmissionIds, setAdjacentSubmissionIds] = useState<{ prevId: string | null, nextId: string | null }>({ prevId: null, nextId: null })
-  const [isReferenceSolutionExpanded, setIsReferenceSolutionExpanded] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
+  const [isReferenceSolutionExpanded, setIsReferenceSolutionExpanded] = useState(false)
+  const {user} = UserAuth();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true)
-      try {
-        const [assignmentResponse, submissionResponse, totalSubmissionsResponse] = await Promise.all([
-          assignmentApi.getAssignmentById(params.assignmentId),
-          submissionApi.getSubmissionByAssignmentProblemAndStudent(params.assignmentId, params.problemId, '1'),
-          submissionApi.getSubmissionsByAssignmentId(params.assignmentId)
-        ])
+  // Fetch assignment data
+  const {
+    data: assignment,
+    isLoading: assignmentLoading,
+    error: assignmentError
+  } = useGetAssignmentById(params.assignmentId)
 
-        if (assignmentResponse.data && submissionResponse.data && totalSubmissionsResponse.data) {
-          setAssignment(assignmentResponse.data)
-          setSubmission(submissionResponse.data)
-          setTotalSubmissions(totalSubmissionsResponse.data.length)
-          
-          const foundProblem = assignmentResponse.data.problems.find(p => p.id === params.problemId)
-          if (foundProblem) {
-            setProblem(foundProblem)
-          } else {
-            throw new Error('Problem not found')
-          }
+  // Get the problem from the assignment
+  const problem = assignment?.problems.find(p => p._id?.toString() === params.problemId)
 
-          const studentResponse = await userApi.getUserById(submissionResponse.data.studentId)
-          if (studentResponse.data) {
-            setStudent(studentResponse.data)
-          } else {
-            throw new Error('Failed to fetch student data')
-          }
+  // Fetch submission data
+  const {
+    data: submission,
+    isLoading: submissionLoading,
+    error: submissionError
+  } = useGetSubmissionsByStudentIdAssignmentIdAndProblemId(
+    user?._id.toString() || '',
+    params.assignmentId,
+    params.problemId, 
+    {enabled: !!user}
+  )
 
-          const submissions = totalSubmissionsResponse.data;
-          const currentIndex = submissions.findIndex(s => s._id === params.submissionId);
-          setCurrentSubmissionIndex(currentIndex + 1)
+  // Fetch all submissions for navigation
+  const {
+    data: allSubmissions = [],
+    isLoading: allSubmissionsLoading,
+    error: allSubmissionsError
+  } = useGetSubmissionsByAssignmentId(params.assignmentId)
 
-          setAdjacentSubmissionIds({
-            prevId: currentIndex > 0 ? submissions[currentIndex - 1]._id : null,
-            nextId: currentIndex < submissions.length - 1 ? submissions[currentIndex + 1]._id : null,
-          });
-        } else {
-          throw new Error('Failed to fetch necessary data')
-        }
-      } catch (err) {
-        toast({
-          title: "Error",
-          description: "Failed to fetch data. Please try again.",
-          variant: "destructive",
-        })
-        router.push(`/manage-courses/${params.courseId}/discrepancy-reports/${params.assignmentId}/${params.problemId}`)
-      } finally {
-        setLoading(false)
-      }
-    }
+  // Fetch student data once we have the submission
+  const {
+    data: student,
+    isLoading: studentLoading,
+    error: studentError
+  } = useGetUserById(submission?.studentId?.toString() || '', {
+    enabled: !!submission?.studentId
+  })
 
-    fetchData()
-  }, [params, router, toast])
+  // Calculate navigation state
+  const currentIndex = allSubmissions.findIndex(s => s._id?.toString() === params.submissionId)
+  const adjacentSubmissionIds = {
+    prevId: currentIndex > 0 ? allSubmissions[currentIndex - 1]?._id?.toString() : null,
+    nextId: currentIndex < allSubmissions.length - 1 ? allSubmissions[currentIndex + 1]?._id?.toString() : null,
+  }
 
+  // Navigation handler
   const navigateSubmission = (direction: 'prev' | 'next') => {
     if (direction === 'prev' && adjacentSubmissionIds.prevId) {
       router.push(`/manage-courses/${params.courseId}/discrepancy-reports/${params.assignmentId}/${params.problemId}/${adjacentSubmissionIds.prevId}`)
@@ -101,7 +85,9 @@ export default function DiscrepancyReportPage({
     }
   }
 
-  if (loading) {
+  // Loading state
+  const isLoading = assignmentLoading || submissionLoading || allSubmissionsLoading || studentLoading
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -109,6 +95,13 @@ export default function DiscrepancyReportPage({
     )
   }
 
+  // Error handling
+  if (assignmentError || submissionError || allSubmissionsError || studentError || !problem) {
+    router.push(`/manage-courses/${params.courseId}/discrepancy-reports/${params.assignmentId}/${params.problemId}`)
+    return null
+  }
+
+  // Required data validation
   if (!assignment || !problem || !submission || !student) {
     return <div className="text-center text-red-500">Required data not found.</div>
   }
@@ -119,7 +112,9 @@ export default function DiscrepancyReportPage({
         <div className="flex justify-between items-center">
           <BackButton backLink={`/manage-courses/${params.courseId}/discrepancy-reports/${params.assignmentId}/${params.problemId}`} />
           <div>
-            <h2 className="text-xl font-medium text-gray-700 dark:text-gray-300">{assignment.title} - Problem {problem.id}</h2>
+            <h2 className="text-xl font-medium text-gray-700 dark:text-gray-300">
+              {assignment.title} - Q{problem.orderIndex + 1}
+            </h2>
           </div>
         </div>
 
@@ -135,6 +130,7 @@ export default function DiscrepancyReportPage({
                 </div>
               </CardContent>
             </Card>
+            
             <Collapsible
               open={isReferenceSolutionExpanded}
               onOpenChange={setIsReferenceSolutionExpanded}
@@ -145,7 +141,10 @@ export default function DiscrepancyReportPage({
                   <CollapsibleTrigger asChild>
                     <Button variant="ghost" className="w-full flex justify-between items-center p-0">
                       <CardTitle>Reference Solution</CardTitle>
-                      {isReferenceSolutionExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      {isReferenceSolutionExpanded ? 
+                        <ChevronUp className="h-4 w-4" /> : 
+                        <ChevronDown className="h-4 w-4" />
+                      }
                     </Button>
                   </CollapsibleTrigger>
                 </CardHeader>
@@ -159,26 +158,21 @@ export default function DiscrepancyReportPage({
               </Card>
             </Collapsible>
           </div>
+
           <div>
             <ProfessorDisputeReviewSection
-              problem={problem}
-              submission={submission}
-              studentId={submission.studentId}
-              onSubmissionUpdate={(updatedSubmission) => {
-                setSubmission(updatedSubmission);
-                toast({
-                  title: 'Success',
-                  description: 'Discrepancy resolved and submission updated.',
-                });
-              }}
+              assignmentId={params.assignmentId}
+              problemId={params.problemId}
+              submissionId={params.submissionId}
             />
           </div>
         </div>
       </div>
+
       <div className="fixed bottom-0 left-0 right-0 bg-background border-t w-full z-50">
         <NavigationBar
-          currentIndex={currentSubmissionIndex}
-          totalSubmissions={totalSubmissions}
+          currentIndex={currentIndex + 1}
+          totalSubmissions={allSubmissions.length}
           onPrevious={() => navigateSubmission('prev')}
           onNext={() => navigateSubmission('next')}
           hasPrevious={!!adjacentSubmissionIds.prevId}
@@ -186,9 +180,9 @@ export default function DiscrepancyReportPage({
           courseId={params.courseId}
           assignmentId={params.assignmentId}
           problemId={params.problemId}
+          mode='professor-dispute-review'
         />
       </div>
     </div>
   )
 }
-

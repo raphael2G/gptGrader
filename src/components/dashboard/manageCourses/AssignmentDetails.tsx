@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { CalendarIcon, Edit } from 'lucide-react'
-import { IAssignment, IProblem } from '@@/models/Assignment'
+import { Bold, CalendarIcon, Edit, Loader2 } from 'lucide-react'
+import { IAssignment } from '@/models/Assignment'
+import { useRouter } from 'next/navigation'
 import { useToast } from "@/components/ui/use-toast"
 import {
   AlertDialog,
@@ -16,20 +17,147 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { 
+  useGetAssignmentById,
+  useUpdateAssignment
+} from '@/hooks/queries/useAssignments'
 
-interface AssignmentDetailsProps {
-  assignment: IAssignment
-  editedAssignment: IAssignment
-  isEditDialogOpen: boolean
-  setIsEditDialogOpen: (isOpen: boolean) => void
-  setEditedAssignment: (assignment: IAssignment) => void
-  handleUpdateAssignment: () => void
-  handleStatusChange: () => void
-  problems: IProblem[]
+// Skeleton loader component for assignment details
+const AssignmentDetailsSkeleton = () => (
+  <Card>
+    <CardHeader>
+      <div className="h-6 w-48 bg-gray-200 animate-pulse rounded"></div>
+    </CardHeader>
+    <CardContent className="space-y-4">
+      <div className="space-y-2">
+        <div className="h-4 w-24 bg-gray-200 animate-pulse rounded"></div>
+        <div className="h-4 w-48 bg-gray-200 animate-pulse rounded"></div>
+      </div>
+      <div className="flex justify-between">
+        <div className="h-8 w-32 bg-gray-200 animate-pulse rounded"></div>
+        <div className="h-8 w-32 bg-gray-200 animate-pulse rounded"></div>
+      </div>
+    </CardContent>
+  </Card>
+)
+
+// Error display component
+const ErrorDisplay = ({ error, onRetry }: { error: Error; onRetry: () => void }) => (
+  <Card className="bg-red-50">
+    <CardContent className="pt-6">
+      <div className="text-center space-y-4">
+        <p className="text-red-600 font-medium">Error loading assignment:</p>
+        <p className="text-sm text-red-500">{error.message}</p>
+        <Button onClick={onRetry} variant="outline" className="mt-2">
+          Try Again
+        </Button>
+      </div>
+    </CardContent>
+  </Card>
+)
+
+
+// Assignment edit form component
+const AssignmentEditForm = ({
+  assignment,
+  onSubmit,
+  onCancel,
+  isSubmitting,
+  validationError
+}: {
+  assignment: IAssignment;
+  onSubmit: (data: Partial<IAssignment>) => void;
+  onCancel: () => void;
+  isSubmitting: boolean;
+  validationError: string | null;
+}) => {
+  const [formData, setFormData] = useState({
+    title: assignment.title,
+    description: assignment.description,
+    dueDate: new Date(assignment.dueDate).toISOString().slice(0, 16),
+    lateDueDate: new Date(assignment.lateDueDate).toISOString().slice(0, 16)
+  })
+
+  const handleSubmit = () => {
+    const dueDate = new Date(formData.dueDate)
+    const lateDueDate = new Date(formData.lateDueDate)
+
+    onSubmit({
+      ...formData,
+      dueDate,
+      lateDueDate
+    })
+  }
+
+  return (
+    <div className="space-y-4 py-4">
+      <div className="space-y-2">
+        <Label htmlFor="edit-title">Title</Label>
+        <Input
+          id="edit-title"
+          value={formData.title}
+          onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+          disabled={isSubmitting}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="edit-description">Description</Label>
+        <Input
+          id="edit-description"
+          value={formData.description}
+          onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+          disabled={isSubmitting}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="edit-due-date">Due Date</Label>
+        <Input
+          id="edit-due-date"
+          type="datetime-local"
+          value={formData.dueDate}
+          onChange={(e) => setFormData(prev => ({ ...prev, dueDate: e.target.value }))}
+          disabled={isSubmitting}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="edit-late-due-date">Late Due Date</Label>
+        <Input
+          id="edit-late-due-date"
+          type="datetime-local"
+          value={formData.lateDueDate}
+          onChange={(e) => setFormData(prev => ({ ...prev, lateDueDate: e.target.value }))}
+          disabled={isSubmitting}
+        />
+      </div>
+      {validationError && (
+        <p className="text-sm text-red-500">{validationError}</p>
+      )}
+      <div className="flex justify-end space-x-2">
+        <Button 
+          variant="outline" 
+          onClick={onCancel}
+          disabled={isSubmitting}
+        >
+          Cancel
+        </Button>
+        <Button 
+          onClick={handleSubmit}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : 'Save Changes'}
+        </Button>
+      </div>
+    </div>
+  )
 }
 
+// Status badge component
 const StatusBadge = ({ isPublished }: { isPublished: boolean }) => {
   const getStatusStyles = () => {
     return isPublished
@@ -44,48 +172,91 @@ const StatusBadge = ({ isPublished }: { isPublished: boolean }) => {
   )
 }
 
-export function AssignmentDetails({
-  assignment,
-  editedAssignment,
-  isEditDialogOpen,
-  setIsEditDialogOpen,
-  setEditedAssignment,
-  handleUpdateAssignment,
-  handleStatusChange,
-  problems
-}: AssignmentDetailsProps) {
+// Main component
+export function AssignmentDetails({ assignmentId }: { assignmentId: string }) {
   const { toast } = useToast()
+  const router = useRouter()
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false)
   const [validationError, setValidationError] = useState<string | null>(null)
 
-  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false)
+  // React Query hooks
+  const { data: assignment, isLoading, error } = useGetAssignmentById(assignmentId)
+  const { mutate: updateAssignment, isPending: isUpdatingAssignment } = useUpdateAssignment()
 
-  const getStatusDialogMessage = () => {
-    const visibilityMessage = assignment.isPublished
-      ? 'will no longer see this assignment'
-      : 'will now be able to see this assignment'
-    
-    return {
-      title: `${assignment.isPublished ? "Un-publish this assignment" : "Publish this assignment"}?`,
-      description: `Are you sure you want to ${assignment.isPublished ? "unpublish" : "publish"} this assignment?  Students ${visibilityMessage}.`
-    }
+  if (isLoading) {
+    return <AssignmentDetailsSkeleton />
   }
 
-  const validateAndUpdate = () => {
-    const dueDate = new Date(editedAssignment.dueDate)
-    const lateDeadline = new Date(editedAssignment.finalSubmissionDeadline)
+  if (error || !assignment) {
+    toast({
+      title: "Uh oh. something went wrong finding this assignment",
+      variant: "destructive"
+    })
+    router.back()
+    return <div>Something went wrong</div>
+  }
 
-    if (lateDeadline < dueDate) {
+  const validateDates = (dueDate: Date, lateDueDate: Date): boolean => {
+    if (lateDueDate < dueDate) {
       setValidationError("Late due date cannot be before the due date.")
       toast({
         title: "Validation Error",
         description: "Late due date cannot be before the due date.",
         variant: "destructive",
       })
-      return
+      return false
+    }
+    setValidationError(null)
+    return true
+  }
+
+  const handleUpdateAssignment = (updateData: Partial<IAssignment>) => {
+    if ('dueDate' in updateData && 'lateDueDate' in updateData) {
+      const isValid = validateDates(
+        updateData.dueDate as Date,
+        updateData.lateDueDate as Date
+      )
+      if (!isValid) return
     }
 
-    setValidationError(null)
-    handleUpdateAssignment()
+    updateAssignment(
+      { assignmentId, updateData },
+      {
+        onSuccess: () => {
+          setIsEditDialogOpen(false)
+          toast({
+            title: "Success",
+            description: "Assignment updated successfully",
+          })
+        },
+        onError: (error) => {
+          toast({
+            title: "Error",
+            description: error.message,
+            variant: "destructive",
+          })
+        }
+      }
+    )
+  }
+
+  const handleStatusChange = () => {
+    updateAssignment(
+      {
+        assignmentId,
+        updateData: { isPublished: !assignment.isPublished }
+      },
+      {
+        onSuccess: () => {
+          setIsStatusDialogOpen(false)
+          toast({
+            title: "Success",
+            description: `Assignment ${assignment.isPublished ? "unpublished" : "published"} successfully`,
+          })
+        }
+      }
+    )
   }
 
   const formatDate = (date: Date) => {
@@ -101,13 +272,12 @@ export function AssignmentDetails({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Assignment Information</CardTitle>
+        <CardTitle>{assignment.title}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0 md:space-x-4">
           <div>
-            <p className="font-semibold">Title:</p>
-            <p>{assignment.title}</p>
+            <p>{assignment.description}</p>
           </div>
           <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
             <DialogTrigger asChild>
@@ -121,52 +291,13 @@ export function AssignmentDetails({
                 <DialogTitle>Edit Assignment</DialogTitle>
                 <DialogDescription>Make changes to the assignment details.</DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-title">Title</Label>
-                  <Input
-                    id="edit-title"
-                    value={editedAssignment?.title}
-                    onChange={(e) => setEditedAssignment({ ...editedAssignment!, title: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-description">Description</Label>
-                  <Input
-                    id="edit-description"
-                    value={editedAssignment?.description}
-                    onChange={(e) => setEditedAssignment({ ...editedAssignment!, description: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-due-date">Due Date</Label>
-                  <Input
-                    id="edit-due-date"
-                    type="datetime-local"
-                    value={new Date(editedAssignment?.dueDate).toISOString().slice(0, 16)}
-                    onChange={(e) => setEditedAssignment({ 
-                      ...editedAssignment!, 
-                      dueDate: new Date(e.target.value) 
-                    })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-late-due-date">Late Due Date</Label>
-                  <Input
-                    id="edit-late-due-date"
-                    type="datetime-local"
-                    value={new Date(editedAssignment?.finalSubmissionDeadline).toISOString().slice(0, 16)}
-                    onChange={(e) => setEditedAssignment({ 
-                      ...editedAssignment!, 
-                      finalSubmissionDeadline: new Date(e.target.value)
-                    })}
-                  />
-                </div>
-                {validationError && (
-                  <p className="text-sm text-red-500">{validationError}</p>
-                )}
-              </div>
-              <Button onClick={validateAndUpdate}>Save Changes</Button>
+              <AssignmentEditForm
+                assignment={assignment}
+                onSubmit={handleUpdateAssignment}
+                onCancel={() => setIsEditDialogOpen(false)}
+                isSubmitting={isUpdatingAssignment}
+                validationError={validationError}
+              />
             </DialogContent>
           </Dialog>
         </div>
@@ -185,37 +316,48 @@ export function AssignmentDetails({
             <div>
               <p className="font-semibold">Late Due:</p>
               <p className="text-sm text-muted-foreground">
-                {formatDate(assignment.finalSubmissionDeadline)}
+                {formatDate(assignment.lateDueDate)}
               </p>
             </div>
           </div>
           <div>
             <p className="font-semibold">Status:</p>
-            <div onClick={() => setIsStatusDialogOpen(true)} className="cursor-pointer">
+            <div 
+              onClick={() => !isUpdatingAssignment && setIsStatusDialogOpen(true)} 
+              className={`cursor-pointer ${isUpdatingAssignment ? 'opacity-50' : ''}`}
+            >
               <StatusBadge isPublished={assignment.isPublished} />
             </div>
           </div>
           <div>
             <p className="font-semibold">Problems:</p>
-            <p className="text-sm text-muted-foreground">{problems.length}</p>
+            <p className="text-sm text-muted-foreground">{assignment.problems.length}</p>
           </div>
         </div>
       </CardContent>
+
       <AlertDialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{getStatusDialogMessage().title}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {`${assignment.isPublished ? "Un-publish" : "Publish"} this assignment?`}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              {getStatusDialogMessage().description}
+              Students will {assignment.isPublished ? "no longer" : "now"} be able to see this assignment.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => {
-              handleStatusChange()
-              setIsStatusDialogOpen(false)
-            }}>
-              Continue
+            <AlertDialogCancel disabled={isUpdatingAssignment}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleStatusChange}
+              disabled={isUpdatingAssignment}
+            >
+              {isUpdatingAssignment ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : 'Continue'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

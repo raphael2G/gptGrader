@@ -1,70 +1,70 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { BackButton } from '@/components/various/BackButton'
-import { assignmentApi } from '@/app/lib/client-api/assignments'
-import { submissionApi } from '@/app/lib/client-api/submissions'
-import { IAssignment } from '@@/models/Assignment'
-import { ISubmission } from '@@/models/Submission'
+import { IAssignment } from '@/models/Assignment'
 import { useToast } from "@/components/ui/use-toast"
 import { GradingProblemCard } from '@/components/dashboard/grading/GradingProblemCard'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useGetAssignmentById } from '@/hooks/queries/useAssignments'
+import { useGetSubmissionsByAssignmentId } from '@/hooks/queries/useSubmissions'
+import { Loader2 } from "lucide-react"
 
-export default function AssignmentGradingPage({ params }: { params: { courseId: string, assignmentId: string } }) {
-  const [assignment, setAssignment] = useState<IAssignment | null>(null)
-  const [submissions, setSubmissions] = useState<ISubmission[]>([])
-  const [loading, setLoading] = useState(true)
+export default function AssignmentGradingPage({ 
+  params 
+}: { 
+  params: { courseId: string, assignmentId: string } 
+}) {
+  // Standard setup
   const router = useRouter()
   const { toast } = useToast()
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true)
-      try {
-        const [assignmentResponse, submissionsResponse] = await Promise.all([
-          assignmentApi.getAssignmentById(params.assignmentId),
-          submissionApi.getSubmissionsByAssignmentId(params.assignmentId)
-        ])
+  // Data fetching with React Query
+  const {
+    data: assignment,
+    isLoading: assignmentLoading,
+    error: assignmentError
+  } = useGetAssignmentById(params.assignmentId)
 
-        if (assignmentResponse.data && submissionsResponse.data) {
-          setAssignment(assignmentResponse.data)
-          setSubmissions(submissionsResponse.data)
-        } else {
-          throw new Error('Failed to fetch assignment or submissions data')
-        }
-      } catch (err) {
-        toast({
-          title: "Error",
-          description: "Failed to fetch data. Please try again.",
-          variant: "destructive",
-        })
-        router.push(`/manage-courses/${params.courseId}/grading`)
-      } finally {
-        setLoading(false)
-      }
-    }
+  const {
+    data: submissions = [], // Default to empty array
+    isLoading: submissionsLoading,
+    error: submissionsError
+  } = useGetSubmissionsByAssignmentId(params.assignmentId)
 
-    fetchData()
-  }, [params.courseId, params.assignmentId, router, toast])
-
-  if (loading) {
-    return <div>Loading assignment data...</div>
+  // Loading state
+  if (assignmentLoading || submissionsLoading) {
+    return (
+      <div className="flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
   }
 
-  if (!assignment) {
-    return <div>Assignment not found.</div>
+  // Error handling
+  if (assignmentError || submissionsError || !assignment) {
+    toast({
+      title: "Error loading data",
+      description: "Failed to fetch assignment data. Please try again.",
+      variant: "destructive",
+    })
+    router.push(`/manage-courses/${params.courseId}/grading`)
+    return null
   }
 
+  // Compute derived state
   const totalSubmissions = submissions.length
   const gradedSubmissions = submissions.filter(s => s.graded).length
-  const overallGradingProgress = totalSubmissions > 0 ? (gradedSubmissions / totalSubmissions) * 100 : 0
+  const overallGradingProgress = totalSubmissions > 0 
+    ? (gradedSubmissions / totalSubmissions) * 100 
+    : 0
 
   return (
     <div className="space-y-6">
       <BackButton />
       <h1 className="text-3xl font-bold">Grading: {assignment.title}</h1>
+      
       <Card>
         <CardHeader>
           <CardTitle>Assignment Details</CardTitle>
@@ -72,8 +72,7 @@ export default function AssignmentGradingPage({ params }: { params: { courseId: 
         <CardContent>
           <p><strong>Description:</strong> {assignment.description}</p>
           <p><strong>Due Date:</strong> {new Date(assignment.dueDate).toLocaleDateString()}</p>
-          <p><strong>Final Submission Deadline:</strong> {new Date(assignment.finalSubmissionDeadline).toLocaleDateString()}</p>
-          <p><strong>Grading Status:</strong> {assignment.gradingStatus}</p>
+          <p><strong>Late Due Date:</strong> {new Date(assignment.lateDueDate).toLocaleDateString()}</p>
           
           <div className="mt-4">
             <h3 className="text-lg font-semibold mb-2">Overall Grading Progress</h3>
@@ -99,13 +98,19 @@ export default function AssignmentGradingPage({ params }: { params: { courseId: 
           </div>
         </CardContent>
       </Card>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {assignment.problems.map((problem, index) => (
-          <Link key={problem.id} href={`/manage-courses/${params.courseId}/grading/${params.assignmentId}/${problem.id}`}>
+          <Link 
+            key={problem._id?.toString()} 
+            href={`/manage-courses/${params.courseId}/grading/${params.assignmentId}/${problem._id?.toString()}`}
+          >
             <GradingProblemCard 
               problem={problem}
               questionNumber={index + 1}
-              submissions={submissions.filter(s => s.problemId === problem.id)}
+              submissions={submissions.filter(s => 
+                s.problemId.toString() === problem._id?.toString()
+              )}
             />
           </Link>
         ))}
@@ -113,4 +118,3 @@ export default function AssignmentGradingPage({ params }: { params: { courseId: 
     </div>
   )
 }
-

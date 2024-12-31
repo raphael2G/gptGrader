@@ -1,59 +1,123 @@
-import { useState, useEffect } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { useToast } from "@/components/ui/use-toast"
-import { assignmentApi } from '@/app/lib/client-api/assignments'
+import { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/use-toast";
+import { useGetAssignmentById } from '@/hooks/queries/useAssignments';
+import { Loader2 } from 'lucide-react';
+import { useUpdateProblemReferenceSolution } from '@/hooks/queries/useAssignments';
 
 interface ReferenceSolutionDialogProps {
   assignmentId: string;
   problemId: string;
-  questionNumber: number;
-  initialSolution?: string;
-  onUpdate: (newSolution: string) => void;
 }
 
-export function ReferenceSolutionDialog({ assignmentId, problemId, questionNumber, initialSolution, onUpdate }: ReferenceSolutionDialogProps) {
+export function ReferenceSolutionDialog({ 
+  assignmentId, 
+  problemId
+}: ReferenceSolutionDialogProps) {
+  // Local UI state
   const [isOpen, setIsOpen] = useState(false);
-  const [solution, setSolution] = useState(initialSolution || '');
   const { toast } = useToast();
 
-  useEffect(() => {
-    setSolution(initialSolution || '');
-  }, [initialSolution]);
+  // Get assignment data to find problem details
+  const { 
+    data: assignment, 
+    isLoading: assignmentLoading,
+    error: assignmentError 
+  } = useGetAssignmentById(assignmentId);
 
-  const handleUpdate = async () => {
-    try {
-      const response = await assignmentApi.updateProblemReferenceSolution(assignmentId, problemId, solution);
-      if (response.data) {
-        onUpdate(solution);
-        setIsOpen(false);
-        toast({
-          title: "Success",
-          description: "Reference solution updated successfully.",
-        });
-      } else {
-        throw new Error(response.error?.error || 'Failed to update reference solution');
-      }
-    } catch (err) {
-      toast({
-        title: "Error",
-        description: "Failed to update reference solution. Please try again.",
-        variant: "destructive",
-      });
+
+  // Mutation for updating reference solution
+  const { mutate: updateProblemRefSol, isPending } = useUpdateProblemReferenceSolution();
+
+
+  // Find the problem and its index
+  const problem = assignment?.problems.find(p => p._id?.toString() === problemId);
+
+    // Handle loading state
+    if (assignmentLoading) {
+      return (
+        <Button variant="outline" disabled>
+          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+          Loading...
+        </Button>
+      );
     }
+  
+    // Handle error state
+    if (assignmentError || !problem || !assignment) {
+      return (
+        <Button 
+          variant="outline" 
+          disabled 
+          onClick={() => {
+            toast({
+              title: "Error",
+              description: "Could not load reference solution",
+              variant: "destructive"
+            });
+          }}
+        >
+          Error Loading Solution
+        </Button>
+      );
+    }
+  
+  // Local state for solution text, initialized from problem data
+  const [solution, setSolution] = useState(problem?.referenceSolution || '');
+  const questionNumber = problem ? assignment.problems.indexOf(problem) + 1 : 0;
+
+
+  // Update solution state when problem data changes
+  useEffect(() => {
+    if (problem?.referenceSolution) {
+      setSolution(problem.referenceSolution);
+    }
+  }, [problem]);
+
+
+  // Handler for updating the reference solution
+  const handleUpdate = () => {
+    updateProblemRefSol(
+      
+      {
+        assignmentId: assignmentId, 
+        problemId: problemId,
+        referenceSolution: solution
+      },
+      {
+        onSuccess: () => {
+          setIsOpen(false);
+          toast({
+            title: "Success",
+            description: "Reference solution updated successfully",
+            variant: "success"
+          });
+        },
+        onError: (error) => {
+          toast({
+            title: "Error updating reference solution",
+            description: "Please try again",
+            variant: "destructive"
+          });
+        }
+      }
+    );
   };
+
+
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button variant="outline">
-          {initialSolution ? "View Reference Solution" : "Add Reference Solution"}
+          {problem.referenceSolution ? "View Reference Solution" : "Add Reference Solution"}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[625px]">
         <DialogHeader>
-          <DialogTitle>Q{questionNumber} - Reference Solution </DialogTitle>
+          <DialogTitle>Q{questionNumber} - Reference Solution</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <Textarea
@@ -63,9 +127,13 @@ export function ReferenceSolutionDialog({ assignmentId, problemId, questionNumbe
             className="h-[300px]"
           />
         </div>
-        <Button onClick={handleUpdate}>Update and Close</Button>
+        <Button 
+          onClick={handleUpdate}
+          isLoading={isPending}
+        >
+          Update and Close
+        </Button>
       </DialogContent>
     </Dialog>
   );
 }
-

@@ -1,17 +1,25 @@
+// src/services/submissionServices.ts
+
 import { Types } from 'mongoose';
+
+import { ISubmission } from '@/models/Submission';
 import { 
   getSubmissionByIdQuery,
   upsertSubmissionQuery,
-  getSubmissionsByStudentQuery,
-  getSubmissionsByAssignmentQuery,
-  getSubmissionsByProblemQuery
+  getSubmissionsByStudentIdQuery,
+  getSubmissionsByAssignmentIdQuery,
+  getSubmissionsByProblemIdQuery, 
+  updateSubmissionGradingQuery, 
+  updateSubmissionSelfGradingQuery
 } from '@/queries/submissionQueries';
-import { ISubmission } from '@/models/Submission';
 
 /**
  * Gets a submission by its ID
+ * @param submissionId ID of the submission
+ * @returns The submission document if found
+ * @throws Error if the operation fails
  */
-export async function getSubmissionById(submissionId: Types.ObjectId) {
+export async function getSubmissionById(submissionId: Types.ObjectId): Promise<ISubmission> {
   try {
     const submission = await getSubmissionByIdQuery(submissionId);
     if (!submission) {
@@ -25,24 +33,19 @@ export async function getSubmissionById(submissionId: Types.ObjectId) {
 
 /**
  * Creates a new submission or updates an existing one
- * This is primarily used when students submit their answers or when grading is updated
  */
 export async function upsertSubmission(
-  submissionData: {
+  submissionData: Partial<ISubmission> & {
     assignmentId: Types.ObjectId;
     problemId: Types.ObjectId;
     studentId: Types.ObjectId;
-    answer?: string;
-    graded?: boolean;
-    gradedBy?: Types.ObjectId;
-    appliedRubricItems?: Types.ObjectId[];
-    feedback?: string;
-    selfGraded?: boolean;
-    selfGradedAppliedRubricItems?: Types.ObjectId[];
   }
-) {
+): Promise<ISubmission> {
   try {
     const submission = await upsertSubmissionQuery(submissionData);
+    if (!submission) {
+      throw new Error('Failed to create/update submission');
+    }
     return submission;
   } catch (error) {
     throw new Error(`Failed to upsert submission: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -50,12 +53,13 @@ export async function upsertSubmission(
 }
 
 /**
- * Gets all submissions by a specific student
- * Useful for viewing a student's complete submission history
+ * Gets all submissions for a specific student
+ * @param studentId ID of the student
+ * @returns Array of submission documents
  */
-export async function getSubmissionsByStudent(studentId: Types.ObjectId) {
+export async function getSubmissionsByStudent(studentId: Types.ObjectId): Promise<ISubmission[]> {
   try {
-    const submissions = await getSubmissionsByStudentQuery(studentId);
+    const submissions = await getSubmissionsByStudentIdQuery(studentId);
     return submissions;
   } catch (error) {
     throw new Error(`Failed to fetch student submissions: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -64,11 +68,12 @@ export async function getSubmissionsByStudent(studentId: Types.ObjectId) {
 
 /**
  * Gets all submissions for a specific assignment
- * Useful for bulk grading or reviewing all student work for an assignment
+ * @param assignmentId ID of the assignment
+ * @returns Array of submission documents
  */
-export async function getSubmissionsByAssignment(assignmentId: Types.ObjectId) {
+export async function getSubmissionsByAssignment(assignmentId: Types.ObjectId): Promise<ISubmission[]> {
   try {
-    const submissions = await getSubmissionsByAssignmentQuery(assignmentId);
+    const submissions = await getSubmissionsByAssignmentIdQuery(assignmentId);
     return submissions;
   } catch (error) {
     throw new Error(`Failed to fetch assignment submissions: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -77,11 +82,12 @@ export async function getSubmissionsByAssignment(assignmentId: Types.ObjectId) {
 
 /**
  * Gets all submissions for a specific problem
- * Useful when grading a specific problem across all students
+ * @param problemId ID of the problem
+ * @returns Array of submission documents
  */
-export async function getSubmissionsByProblem(problemId: Types.ObjectId) {
+export async function getSubmissionsByProblem(problemId: Types.ObjectId): Promise<ISubmission[]> {
   try {
-    const submissions = await getSubmissionsByProblemQuery(problemId);
+    const submissions = await getSubmissionsByProblemIdQuery(problemId);
     return submissions;
   } catch (error) {
     throw new Error(`Failed to fetch problem submissions: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -89,27 +95,25 @@ export async function getSubmissionsByProblem(problemId: Types.ObjectId) {
 }
 
 /**
- * Updates the grading for a submission
- * Specialized version of upsertSubmission focused on grading updates
+ * Updates the grading information for a submission
  */
 export async function updateSubmissionGrading(
   submissionId: Types.ObjectId,
-  gradingData: {
-    gradedBy: Types.ObjectId;
-    appliedRubricItems: Types.ObjectId[];
-    feedback?: string;
-  }
-) {
+  gradedBy: Types.ObjectId,
+  appliedRubricItems: Types.ObjectId[],
+  feedback?: string
+): Promise<ISubmission> {
   try {
-    const submission = await getSubmissionById(submissionId);
-    const updatedSubmission = await upsertSubmissionQuery({
-      assignmentId: submission.assignmentId,
-      problemId: submission.problemId,
-      studentId: submission.studentId,
-      graded: true,
-      gradedAt: new Date(),
-      ...gradingData
-    });
+    const gradingData = {
+      gradedBy,
+      appliedRubricItems,
+      feedback
+    };
+    console.log("or first is it ehre?")
+    
+    const updatedSubmission = await updateSubmissionGradingQuery(submissionId, gradingData);
+    console.log("is error?")
+    
     return updatedSubmission;
   } catch (error) {
     throw new Error(`Failed to update submission grading: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -118,24 +122,16 @@ export async function updateSubmissionGrading(
 
 /**
  * Updates the self-grading portion of a submission
- * Used when students complete their self-assessment
  */
 export async function updateSubmissionSelfGrading(
   submissionId: Types.ObjectId,
-  selfGradingData: {
-    selfGradedAppliedRubricItems: Types.ObjectId[];
-  }
-) {
+  selfGradedAppliedRubricItems: Types.ObjectId[]
+): Promise<ISubmission> {
   try {
-    const submission = await getSubmissionById(submissionId);
-    const updatedSubmission = await upsertSubmissionQuery({
-      assignmentId: submission.assignmentId,
-      problemId: submission.problemId,
-      studentId: submission.studentId,
-      selfGraded: true,
-      selfGradingCompletedAt: new Date(),
-      ...selfGradingData
-    });
+    const updatedSubmission = await updateSubmissionSelfGradingQuery(
+      submissionId,
+      selfGradedAppliedRubricItems
+    );
     return updatedSubmission;
   } catch (error) {
     throw new Error(`Failed to update submission self-grading: ${error instanceof Error ? error.message : 'Unknown error'}`);

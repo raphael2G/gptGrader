@@ -10,13 +10,17 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import { submissionApi } from '@/app/lib/client-api/submissions';
-import { discrepancyReportApi } from '@/app/lib/client-api/discrepancyReports';
-import { assignmentApi } from '@/app/lib/client-api/assignments';
-import { IProblem, IRubricItem } from '@@/models/Assignment';
-import { ISubmission } from '@@/models/Submission';
-import { IDiscrepancyReport, IDiscrepancyItem } from '@@/models/DiscrepancyReport';
+
 import { cn } from "@/lib/utils";
+import { useGetAssignmentById } from '@/hooks/queries/useAssignments';
+import { useGetSubmissionsByStudentIdAssignmentIdAndProblemId } from '@/hooks/queries/useSubmissions';
+import { IDiscrepancyItem } from '@/models/DiscrepancyReport';
+import { ISubmission } from '@/models/Submission';
+import {
+  useCreateOrUpdateDiscrepancyReport, 
+  useGetDiscrepancyReportBySubmissionId
+} from "@/hooks/queries/useDiscrepancyReports"
+
 
 interface CombinedRubricSectionProps {
   assignmentId: string;
@@ -25,74 +29,68 @@ interface CombinedRubricSectionProps {
 }
 
 export function CombinedRubricSection({ assignmentId, problemId, studentId }: CombinedRubricSectionProps) {
-  const [problem, setProblem] = useState<IProblem | null>(null);
-  const [submission, setSubmission] = useState<ISubmission | null>(null);
-  const [discrepancyReport, setDiscrepancyReport] = useState<IDiscrepancyReport | null>(null);
-  const [loading, setLoading] = useState(true);
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [selectedOption, setSelectedOption] = useState<"student" | "instructor" | null>(null);
   const [comment, setComment] = useState("");
   const { toast } = useToast();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const [assignmentResponse, submissionResponse] = await Promise.all([
-          assignmentApi.getAssignmentById(assignmentId),
-          submissionApi.getSubmissionByAssignmentProblemAndStudent(assignmentId, problemId, studentId)
-        ]);
+  // Fetch assignment data
+  const { data: assignment, isLoading: isLoadingAssignment } = useGetAssignmentById(assignmentId);
+  const problem = assignment?.problems.find(p => p._id?.toString() === problemId);
 
-        if (assignmentResponse.data && submissionResponse.data) {
-          const foundProblem = assignmentResponse.data.problems.find(p => p.id === problemId);
-          setProblem(foundProblem || null);
-          setSubmission(submissionResponse.data);
+  // Fetch submission data
+  const { 
+    data: submission, 
+    isLoading: isLoadingSubmission 
+  } = useGetSubmissionsByStudentIdAssignmentIdAndProblemId(studentId, assignmentId, problemId);
 
-          const discrepancyResponse = await discrepancyReportApi.getDiscrepancyReportsBySubmission(submissionResponse.data._id!);
-          if (discrepancyResponse.data && discrepancyResponse.data.length > 0) {
-            setDiscrepancyReport(discrepancyResponse.data[0]);
-          }
-        } else {
-          throw new Error('Failed to fetch problem or submission data');
-        }
-      } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to load data. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Fetch discrepancy report data using placeholder hook
+  const { 
+    data: discrepancyReport, 
+    isLoading: isLoadingDiscrepancy 
+  } = useGetDiscrepancyReportBySubmissionId(submission?._id?.toString() || '', {enabled: !!submission});
 
-    fetchData();
-  }, [assignmentId, problemId, studentId, toast]);
+  // Create/update discrepancy report mutation using placeholder hook
+  const { mutate: createOrUpdateDiscrepancy, isPending: isSubmitting } = useCreateOrUpdateDiscrepancyReport();
 
-  if (loading || !problem || !submission) {
+  // Rest of the component remains the same...
+  if (isLoadingAssignment || isLoadingSubmission || isLoadingDiscrepancy || !problem || !submission) {
     return <div>Loading...</div>;
   }
 
-  const studentSelections = submission.selfAssessedRubricItems?.map(i => i.rubricItemId) || [];
-  const instructorSelections = submission.appliedRubricItemIds;
+  if (!assignment){
+    return <div>Could not find assignment</div>
+  }
+
+  if (!submission){
+    return <div>Could not find submission</div>
+  }
+
+
+  const studentSelections = submission?.selfGradedAppliedRubricItems?.map((id) => id.toString()) || [];
+
+
+  const instructorSelections = submission?.appliedRubricItems?.map((id) => id.toString()) || [];
+
+
 
   const calculatePoints = (selectedItems: string[] | undefined) => {
     if (!problem || !selectedItems) return 0;
-    return problem.rubric.reduce((total, item) =>
-      total + (selectedItems.includes(item.id) ? item.points : 0), 0
+    return problem.rubric.items.reduce((total, item) =>
+      total + (selectedItems.includes(item._id?.toString() || '') ? item.points : 0), 0
     );
   };
 
   const handleRubricItemClick = (itemId: string) => {
     setExpandedItemId(prevId => prevId === itemId ? null : itemId);
-    if (!discrepancyReport?.items.find(i => i.rubricItemId === itemId)) {
+    if (!discrepancyReport?.items.find(i => i.rubricItemId.toString() === itemId)) {
       setSelectedOption(null);
       setComment("");
     }
   };
 
-  const handleSubmit = async () => {
-    if (!selectedOption || !comment || !expandedItemId || !submission) {
+  const handleSubmit = () => {
+    if (!selectedOption || !comment || !expandedItemId || !submission?._id) {
       toast({
         description: "Please select an option and provide a comment.",
         variant: "destructive",
@@ -100,23 +98,20 @@ export function CombinedRubricSection({ assignmentId, problemId, studentId }: Co
       return;
     }
 
-    try {
-      const discrepancyItem: IDiscrepancyItem = {
-        submissionId: submission._id!,
-        studentId: studentId,
-        courseId: submission.courseId,
-        assignmentId: assignmentId,
-        problemId: problemId,
-        rubricItemId: expandedItemId,
-        wasApplied: instructorSelections.includes(expandedItemId),
-        studentThinksShouldBeApplied: selectedOption === 'instructor',
-        studentExplanation: comment,
-      };
+    const discrepancyItem = {
+      submissionId: submission._id.toString(),
+      studentId: studentId,
+      courseId: assignment.courseId.toString(),
+      assignmentId: assignmentId,
+      problemId: problemId,
+      rubricItemId: expandedItemId,
+      wasOriginallyApplied: instructorSelections.includes(expandedItemId),
+      studentThinksShouldBeApplied: selectedOption === 'instructor',
+      studentExplanation: comment,
+    };
 
-      const response = await discrepancyReportApi.createOrUpdateDiscrepancyReport(discrepancyItem);
-
-      if (response.data) {
-        setDiscrepancyReport(response.data);
+    createOrUpdateDiscrepancy(discrepancyItem, {
+      onSuccess: () => {
         setExpandedItemId(null);
         setSelectedOption(null);
         setComment("");
@@ -124,16 +119,15 @@ export function CombinedRubricSection({ assignmentId, problemId, studentId }: Co
           title: "Success",
           description: "Discrepancy report submitted successfully.",
         });
-      } else {
-        throw new Error(response.error?.error || 'Failed to create discrepancy report');
+      },
+      onError: (error) => {
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive",
+        });
       }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
+    });
   };
 
   return (
@@ -143,11 +137,12 @@ export function CombinedRubricSection({ assignmentId, problemId, studentId }: Co
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {problem.rubric.map((item) => {
-            const studentSelected = studentSelections.includes(item.id);
-            const instructorSelected = instructorSelections.includes(item.id);
+          {problem.rubric.items.map((item) => {
+            const studentSelected = studentSelections.includes(item._id.toString());
+            const instructorSelected = instructorSelections.includes(item._id.toString());
+
             const isPositive = item.points >= 0;
-            const discrepancyItem = discrepancyReport?.items.find(i => i.rubricItemId === item.id);
+            const discrepancyItem = discrepancyReport?.items.find(i => i.rubricItemId === item._id);
             const isResolved = discrepancyItem?.resolution !== undefined;
             const isDisputed = studentSelected !== instructorSelected;
 
@@ -161,7 +156,7 @@ export function CombinedRubricSection({ assignmentId, problemId, studentId }: Co
 
             let bgColor = "bg-muted";
             if (isResolved) {
-              const instructorApplied = discrepancyItem?.resolution?.shouldBeApplied;
+              const instructorApplied = discrepancyItem?.resolution?.shouldItemBeApplied;
               bgColor = instructorApplied
                 ? (isPositive ? "bg-green-100 dark:bg-green-900/30" : "bg-red-100 dark:bg-red-900/30")
                 : "bg-gray-200 dark:bg-gray-700";
@@ -177,9 +172,9 @@ export function CombinedRubricSection({ assignmentId, problemId, studentId }: Co
             const hoverEffect = isDisputed || discrepancyItem ? "hover:bg-muted/80 dark:hover:bg-muted/50" : "";
 
             return (
-              <div key={item.id}>
+              <div key={item._id.toString()}>
                 <motion.div
-                  onClick={isDisputed || discrepancyItem ? () => handleRubricItemClick(item.id) : undefined}
+                  onClick={isDisputed || discrepancyItem ? () => handleRubricItemClick(item._id.toString()) : undefined}
                   className={`relative flex items-center p-4 rounded-md border border-gray-200 dark:border-gray-700 ${bgColor} ${cursorClass} ${hoverEffect}`}
                   whileHover={isDisputed || discrepancyItem ? { scale: 1.02 } : {}}
                   whileTap={isDisputed || discrepancyItem ? { scale: 0.98 } : {}}
@@ -201,7 +196,7 @@ export function CombinedRubricSection({ assignmentId, problemId, studentId }: Co
                   </div>
                   {(isDisputed || discrepancyItem) && (
                     <div className="ml-2">
-                      {expandedItemId === item.id ? (
+                      {expandedItemId === item._id.toString() ? (
                         <ChevronUp className="h-4 w-4" />
                       ) : (
                         <ChevronDown className="h-4 w-4" />
@@ -220,7 +215,7 @@ export function CombinedRubricSection({ assignmentId, problemId, studentId }: Co
                   )}
                 </motion.div>
                 <AnimatePresence>
-                  {expandedItemId === item.id && (isDisputed || discrepancyItem) && (
+                  {expandedItemId === item._id.toString() && (isDisputed || discrepancyItem) && (
                     <motion.div
                       layout
                       initial={{ opacity: 0, height: 0 }}
@@ -253,18 +248,18 @@ export function CombinedRubricSection({ assignmentId, problemId, studentId }: Co
                                 </div>
                                 <div className="flex justify-between items-center mt-4">
                                   <Badge variant="default" className={
-                                    discrepancyItem.resolution.shouldBeApplied
+                                    discrepancyItem.resolution.shouldItemBeApplied
                                       ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
                                       : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100"
                                   }>
-                                    {discrepancyItem.resolution.shouldBeApplied ? "Apply Rubric Item" : "Do Not Apply Rubric Item"}
+                                    {discrepancyItem.resolution.shouldItemBeApplied ? "Apply Rubric Item" : "Do Not Apply Rubric Item"}
                                   </Badge>
                                   <Badge variant="outline" className={
-                                    discrepancyItem.resolution.discrepancyType === 'student_error'
+                                    discrepancyItem.resolution.shouldItemBeApplied === discrepancyItem.wasOriginallyApplied
                                       ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100"
                                       : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100"
                                   }>
-                                    {discrepancyItem.resolution.discrepancyType === 'student_error' ? 'Student Error' : 'Grading Error'}
+                                    {discrepancyItem.resolution.shouldItemBeApplied === discrepancyItem.wasOriginallyApplied ? 'Student Error' : 'Grading Error'}
                                   </Badge>
                                 </div>
                               </>
@@ -278,12 +273,12 @@ export function CombinedRubricSection({ assignmentId, problemId, studentId }: Co
                             value={selectedOption}
                           >
                             <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="student" id={`student-${item.id}`} />
-                              <Label htmlFor={`student-${item.id}`}>I am wrong (student)</Label>
+                              <RadioGroupItem value="student" id={`student-${item._id}`} />
+                              <Label htmlFor={`student-${item._id}`}>I am wrong (student)</Label>
                             </div>
                             <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="instructor" id={`instructor-${item.id}`} />
-                              <Label htmlFor={`instructor-${item.id}`}>The initial grade is wrong (instructor)</Label>
+                              <RadioGroupItem value="instructor" id={`instructor-${item._id}`} />
+                              <Label htmlFor={`instructor-${item._id}`}>The initial grade is wrong (instructor)</Label>
                             </div>
                           </RadioGroup>
                           <Textarea

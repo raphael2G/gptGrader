@@ -1,16 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { BackButton } from '@/components/various/BackButton'
-import { assignmentApi } from '@/app/lib/client-api/assignments'
 import { llmApi } from '@/app/lib/client-api/LLM'
-import { IAssignment, IProblem, IRubricItem } from '@@/models/Assignment'
+import { IRubricItem } from '@@/models/Assignment'
 import { useToast } from "@/components/ui/use-toast"
 import { Loader2 } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { RubricSection } from '@/components/various/RubricSection'
+import { useGetAssignmentById, useUpdateAssignment, useUpsertProblem } from '@/hooks/queries/useAssignments'
 
 interface LLMAnalysisResult {
   commonCorrectThings: string[];
@@ -22,55 +22,33 @@ export default function MakeRubricPage({
 }: { 
   params: { courseId: string, assignmentId: string, problemId: string } 
 }) {
-  const [assignment, setAssignment] = useState<IAssignment | null>(null)
-  const [problem, setProblem] = useState<IProblem | null>(null)
-  const [loading, setLoading] = useState(true)
+  // States
   const [llmLoading, setLlmLoading] = useState(false)
   const [llmAnalysis, setLlmAnalysis] = useState<LLMAnalysisResult | null>(null)
-  const [rubricItems, setRubricItems] = useState<IRubricItem[]>([])
   const [generatingRubric, setGeneratingRubric] = useState(false)
-  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+
+  // Hooks
   const router = useRouter()
   const { toast } = useToast()
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true)
-      try {
-        const assignmentResponse = await assignmentApi.getAssignmentById(params.assignmentId)
+  // React Query hooks
+  const { 
+    data: assignment, 
+    isLoading: assignmentLoading,
+    error: assignmentError
+  } = useGetAssignmentById(params.assignmentId)
 
-        if (assignmentResponse.data) {
-          setAssignment(assignmentResponse.data)
-          const foundProblem = assignmentResponse.data.problems.find(p => p.id === params.problemId)
-          if (foundProblem) {
-            setProblem(foundProblem)
-            setRubricItems(foundProblem.rubric || []) // Initialize rubricItems here
-            await fetchLlmAnalysis(foundProblem)
-          } else {
-            throw new Error('Problem not found')
-          }
-        } else {
-          throw new Error('Failed to fetch assignment data')
-        }
-      } catch (err) {
-        toast({
-          title: "Error",
-          description: "Failed to fetch data. Please try again.",
-          variant: "destructive",
-        })
-        router.push(`/manage-courses/${params.courseId}/grading/${params.assignmentId}/${params.problemId}/makeRubric`) // Redirect to makeRubric if error
-      } finally {
-        setLoading(false)
-      }
-    }
+  const { mutate: upsertProblem } = useUpsertProblem()
 
-    fetchData()
-  }, [params.courseId, params.assignmentId, params.problemId, router, toast])
+  // Derived state
+  const problem = assignment?.problems.find(p => p._id?.toString() === params.problemId)
+  const rubricItems = problem?.rubric?.items || []
 
-  const fetchLlmAnalysis = async (problem: IProblem) => {
+  // Effects replacement - fetch LLM analysis when problem is available
+  const fetchLlmAnalysis = async (problemId: string, referenceSolution: string) => {
     setLlmLoading(true)
     try {
-      const response = await llmApi.analyzeSubmissions(problem.id, problem.referenceSolution || '')
+      const response = await llmApi.analyzeSubmissions(problemId, referenceSolution)
       if (response.data) {
         setLlmAnalysis(response.data)
       } else {
@@ -87,136 +65,154 @@ export default function MakeRubricPage({
     }
   }
 
-  const handleRubricChange = (newRubricItems: IRubricItem[]) => {
-    // Immediately update local state for responsive UI
-    setRubricItems(newRubricItems);
+  // If problem exists and has a reference solution, fetch LLM analysis
+  if (problem && problem.referenceSolution && !llmAnalysis && !llmLoading) {
+    fetchLlmAnalysis(problem._id?.toString() || '', problem.referenceSolution)
+  }
 
-    // Update the assignment in the database with correct structure
-    if (problem) {
-      assignmentApi.updateProblem(
-        params.assignmentId, 
-        params.problemId, 
-        { 
-          rubric: { 
-            items: newRubricItems 
+  const handleRubricChange = (newRubricItems: IRubricItem[]) => {
+    if (!problem) return
+
+    upsertProblem(
+      {
+        assignmentId: params.assignmentId,
+        problemData: {
+          ...problem,
+          rubric: {
+            items: newRubricItems
           }
         }
-      )
-        .then(res => {
-          if (res.data) {
-            // Update the full assignment state while preserving the local rubric state
-            setAssignment(prevAssignment => {
-              if (!prevAssignment) return res.data;
-              
-              return {
-                ...res.data,
-                problems: res.data.problems.map(p => {
-                  if (p._id === problem._id) {
-                    return {
-                      ...p,
-                      rubric: { items: newRubricItems }
-                    };
-                  }
-                  return p;
-                })
-              };
-            });
-          }
-        })
-        .catch(err => {
-          // On error, revert the local state
-          setRubricItems(problem.rubric);
-          console.error("Failed to update rubric:", err);
+      },
+      {
+        onError: (error) => {
           toast({
             title: "Error",
-            description: "Failed to update rubric. Please try again.",
+            description: error.message || "Failed to update rubric. Please try again.",
             variant: "destructive",
-          });
-        });
-    }
+          })
+        }
+      }
+    )
   }
 
   const handleSaveRubric = async () => {
     if (!problem) return
 
-    try {
-      const updatedProblem = { ...problem, rubric: rubricItems, rubricFinalized: true }
-      const response = await assignmentApi.updateProblem(params.assignmentId, params.problemId, updatedProblem)
-      
-      if (response.data) {
-        toast({
-          title: "Success",
-          description: "Rubric saved and finalized successfully.",
-        })
-        router.push(`/manage-courses/${params.courseId}/grading/${params.assignmentId}/${params.problemId}/calibrate-rubric`)
-      } else {
-        throw new Error(response.error?.error || 'Failed to save rubric')
+    upsertProblem(
+      {
+        assignmentId: params.assignmentId,
+        problemData: {
+          ...problem,
+          rubric: {
+            items: rubricItems
+          },
+          rubricFinalized: true
+        }
+      },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Success",
+            description: "Rubric saved and finalized successfully.",
+          })
+          router.push(`/manage-courses/${params.courseId}/grading/${params.assignmentId}/${params.problemId}/calibrate-rubric`)
+        },
+        onError: (error) => {
+          toast({
+            title: "Error",
+            description: error.message || "Failed to save rubric. Please try again.",
+            variant: "destructive",
+          })
+        }
       }
-    } catch (err) {
-      toast({
-        title: "Error",
-        description: "Failed to save rubric. Please try again.",
-        variant: "destructive",
-      })
-    }
+    )
   }
 
   const handleGenerateRubric = async () => {
-    if (!problem || !llmAnalysis || !assignment) return; // Add assignment check
+    if (!problem || !llmAnalysis || !assignment) return
 
-    setGeneratingRubric(true);
+    setGeneratingRubric(true)
     try {
       const response = await llmApi.generateRubric(
-        problem.id,
+        problem._id?.toString() || '',
         problem.question,
         problem.referenceSolution || '',
         llmAnalysis.commonCorrectThings,
         llmAnalysis.commonMistakes
-      );
+      )
 
       if (response.data) {
         const generatedRubricItems: IRubricItem[] = response.data.rubricItems.map(item => ({
-          id: `generated-${Date.now()}-${Math.random()}`,
           description: item.description,
           points: item.points
-        }));
+        }))
 
-        // Update both state and database
-        setRubricItems(generatedRubricItems);
-
-        const updatedAssignment = await assignmentApi.updateProblem(
-          params.assignmentId,
-          params.problemId,
-          { rubric: generatedRubricItems }
-        );
-        if (updatedAssignment.data) {
-          toast({
-            title: "Success",
-            description: "Rubric generated successfully.",
-          });
-        } else {
-          throw new Error('Failed to update assignment with generated rubric')
-        }
-      } else {
-        throw new Error(response.error?.error || 'Failed to generate rubric');
+        upsertProblem(
+          {
+            assignmentId: params.assignmentId,
+            problemData: {
+              ...problem,
+              rubric: {
+                items: generatedRubricItems
+              }
+            }
+          },
+          {
+            onSuccess: () => {
+              toast({
+                title: "Success",
+                description: "Rubric generated successfully.",
+              })
+            },
+            onError: (error) => {
+              toast({
+                title: "Error",
+                description: error.message || "Failed to update generated rubric.",
+                variant: "destructive",
+              })
+            }
+          }
+        )
       }
     } catch (err) {
       toast({
         title: "Error",
         description: "Failed to generate rubric. Please try again.",
         variant: "destructive",
-      });
+      })
     } finally {
-      setGeneratingRubric(false);
+      setGeneratingRubric(false)
     }
-  };
-
-  if (loading) {
-    return <div>Loading rubric creation data...</div>
   }
 
-  if (!assignment || !problem) {
-    return <div>Problem not found.</div>
+  // Loading states
+  if (assignmentLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  // Error states
+  if (assignmentError || !assignment) {
+    toast({
+      title: "Error",
+      description: "Failed to fetch assignment data. Please try again.",
+      variant: "destructive",
+    })
+    router.push(`/manage-courses/${params.courseId}/grading`)
+    return null
+  }
+
+  if (!problem) {
+    toast({
+      title: "Error",
+      description: "Problem not found.",
+      variant: "destructive",
+    })
+    router.push(`/manage-courses/${params.courseId}/grading/${params.assignmentId}`)
+    return null
   }
 
   return (
@@ -293,17 +289,16 @@ export default function MakeRubricPage({
         </CardHeader>
         <CardContent>
           <RubricSection
-            rubricItems={rubricItems}
-            onUpdateRubric={handleRubricChange}
-          ></RubricSection>
+            assignmentId={params.assignmentId}
+            problemId={params.problemId}
+          />
         </CardContent>
       </Card>
       <div className="flex justify-end">
-        <Button onClick={() => router.push(`/manage-courses/${params.courseId}/grading/${params.assignmentId}/${params.problemId}/calibrate-rubric`)}>
+        <Button onClick={handleSaveRubric}>
           Calibrate Rubric
         </Button>
       </div>
     </div>
   )
 }
-

@@ -28,6 +28,7 @@ const discrepancyKeys = {
   lists: {
     bySubmission: (submissionId: string) => [...discrepancyKeys.root, 'bySubmissionId', submissionId] as const,
     byAssignment: (assignmentId: string) => [...discrepancyKeys.root, 'byAssignmentId', assignmentId] as const,
+    byRubricItem: (rubricItemId: string) => [...discrepancyKeys.root, 'byRubricItemId', rubricItemId] as const
   }
 } as const
 
@@ -43,8 +44,11 @@ const submissionKeys = {
     byStudent: (studentId: string) => [...submissionKeys.root, 'byStudentId', studentId] as const,
     byAssignment: (assignmentId: string) => [...submissionKeys.root, 'byAssignmentId', assignmentId] as const,
     byProblem: (problemId: string) => [...submissionKeys.root, 'byProblemId', problemId] as const,
-  }
+  }, 
 } as const
+
+
+
 
 
 

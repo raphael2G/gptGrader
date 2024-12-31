@@ -1,23 +1,19 @@
-// app/api/submissions/by-assignment/[assignmentId]/route.ts
-import { NextResponse } from 'next/server';
+// app/api/submissions/assignment/[assignmentId]/route.ts
+import { NextRequest, NextResponse } from 'next/server';
 import { Types } from 'mongoose';
 import { getSubmissionsByAssignment } from '@/services/submissionServices';
 
-interface RouteParams {
-  params: {
-    assignmentId: string;
-  };
-}
-
-export async function GET(req: Request, { params }: RouteParams) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { assignmentId: string } }
+) {
   try {
     const assignmentId = new Types.ObjectId(params.assignmentId);
     const submissions = await getSubmissionsByAssignment(assignmentId);
     return NextResponse.json(submissions);
   } catch (error) {
-    console.error('Failed to fetch assignment submissions:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch assignment submissions' },
+      { error: `Failed to fetch assignment submissions: ${error instanceof Error ? error.message : 'Unknown error'}` },
       { status: 500 }
     );
   }

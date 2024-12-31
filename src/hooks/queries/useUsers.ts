@@ -1,10 +1,57 @@
 // hooks/queries/useUser.ts
-import { useQuery } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import { getQueryConfig } from './config';
 import { queryKeys } from './queryKeys';
 
 import { userApi } from '@/api-client/endpoints/users';
 import { ICourse } from '@/models/Course';
+import { IUser } from '@/models/User';
+
+export function useGetUserById(userId: string, options?: any) {
+
+  return useQuery<IUser, Error>({
+    queryKey: queryKeys.userKeys.item(userId),
+    queryFn: async () => {
+      const response = await userApi.getUserById(userId);
+      if (!response.data) {
+        throw new Error(response.error?.error || 'Failed to fetch user data');
+      }
+      return response.data;
+    },
+    ...getQueryConfig('getUserById', options),
+  });
+}
+
+export function useGetUsersByArrayOfIds(userIds: string[], options?: any) {
+  // Run queries in parallel
+  const userQueries = useQueries({
+    queries: userIds.map((userId) => ({
+      queryKey: queryKeys.userKeys.item(userId),
+      queryFn: async () => {
+        const response = await userApi.getUserById(userId);
+        if (!response.data) {
+          throw new Error(response.error?.error || 'Failed to fetch user');
+        }
+        return response.data;
+      },
+      ...getQueryConfig('getUserById', options),
+    }))
+  });
+
+  // Handle loading, errors, and data aggregation
+  const isLoading = userQueries.some(query => query.isLoading);
+  const error = userQueries.find(query => query.error)?.error;
+  const users = userQueries
+    .map(query => query.data)
+    .filter((user): user is IUser => user !== undefined);
+
+  return {
+    users,
+    isLoading,
+    error,
+    isError: !!error
+  };
+}
 
 /**
  * React Query hook for fetching enrolled courses for a user

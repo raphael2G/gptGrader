@@ -15,59 +15,32 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { UserAuth } from '@/contexts/AuthContext'
+import { useRouter } from 'next/navigation'
 
 import { useEnrolledCourses } from '@/hooks/queries/useUsers'
 import { useJoinCourseByCode } from '@/hooks/queries/useCourses'
 
 export default function Home() {
+  const user = UserAuth().user
+  console.log("user: ", user)
+  const { toast } = useToast()
+  const router = useRouter()
+
   const [courseCode, setCourseCode] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  // const [enrolledCourses1, setEnrolledCourses] = useState<ICourse[]>([])
-  // const [loading, setLoading] = useState(true)
-  // const [error, setError] = useState<string | null>(null)
-  const { toast } = useToast()
-  const user = UserAuth().user
 
-  // useEffect(() => {
-  //   const fetchEnrolledCourses = async () => {
-  //     setLoading(true)
-  //     try {
-  //       const userId = '1' // This should be replaced with the actual logged-in user's ID
-  //       const response = await courseApi.getEnrolledCourses(userId)
-  //       if (response.data) {
-  //         setEnrolledCourses(response.data)
-  //       } else {
-  //         throw new Error(response.error?.error || 'Failed to fetch enrolled courses')
-  //       }
-  //     } catch (err) {
-  //       setError('Failed to fetch enrolled courses')
-  //       toast({
-  //         title: "Error",
-  //         description: "Failed to fetch enrolled courses. Please try again.",
-  //         variant: "destructive",
-  //       })
-  //     } finally {
-  //       setLoading(false)
-  //     }
-  //   }
-
-  //   fetchEnrolledCourses()
-  // }, [toast]) // Remove enrolledCourses from the dependency array
-
-  // if (!user) {
-  //   return <div>Loading the user...</div>
-  // }
-
-  const { data: enrolledCourses = [], isLoading, error } = useEnrolledCourses(user?._id.toString() || '', {enabled: !!user?._id });
+  const { data: enrolledCourses = [], isLoading, error } = useEnrolledCourses(user?._id?.toString() || '', {enabled: !!user?._id });
   const { mutate: joinCourse, isPending: isJoining } = useJoinCourseByCode();
 
+  if (isLoading) {return <div>Loading courses...</div>}
+  if (error) {return <div>Uh oh. Something went wrong loading the course.</div>}
 
   const handleJoinCourse = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
     joinCourse(
-      { courseCode, studentId: user._id.toString() },
+      { courseCode, studentId: user?._id?.toString() },
       {
         onSuccess: (course) => {
           console.log("Will show toast now, but not fron toast")
@@ -94,9 +67,6 @@ export default function Home() {
     );
   };
 
-
-  if (isLoading) {return <div>Loading courses...</div>}
-  if (error) {return <div>Error: {error.message}</div>}
 
   return (
     <div className="space-y-6">
@@ -129,7 +99,15 @@ export default function Home() {
                   required
                 />
               </div>
-              <Button disabled={isJoining} type="submit" className="w-full">{isJoining ? "Joining Course..." : "Join Course"}</Button>
+              {/* <Button disabled={isJoining} type="submit" className="w-full">{isJoining ? "Joining Course..." : "Join Course"}</Button> */}
+              <Button 
+                type="submit" 
+                className="w-full"
+                isLoading={isJoining}
+                icon={PlusCircle}
+              >
+                Join Course
+              </Button>
             </form>
           </DialogContent>
         </Dialog>
@@ -141,8 +119,8 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {enrolledCourses.map((course) => (
               <CourseCard
-                key={course._id}
-                id={course._id}
+                key={course._id.toString()}
+                id={course._id.toString()}
                 title={course.title}
                 description={course.description}
                 assignmentCount={course.assignments.length}

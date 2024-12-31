@@ -1,22 +1,20 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { BackButton } from '@/components/various/BackButton'
-import { userApi } from '@/app/lib/client-api/users'
-import { assignmentApi } from '@/app/lib/client-api/assignments'
-import { submissionApi } from '@/app/lib/client-api/submissions'
-import { IUser } from '@@/models/User'
-import { IAssignment, IProblem, IRubricItem } from '@@/models/Assignment'
-import { ISubmission } from '@@/models/Submission'
 import { useToast } from "@/components/ui/use-toast"
 import { ChevronLeft, ChevronRight, CheckCircle2, XCircle } from 'lucide-react'
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { CollapsibleQuestionScoreChart } from '@/components/dashboard/students/CollapsibleQuestionScoreChart'
+import { useGetAssignmentById } from '@/hooks/queries/useAssignments'
+import { useGetSubmissionsByStudentIdAndAssignmentId } from '@/hooks/queries/useSubmissions'
+import { useGetUserById } from '@/hooks/queries/useUsers'
+import { IProblem, IRubricItem } from '@/models/Assignment'
 
 interface QuestionScore {
   questionNumber: number;
@@ -29,71 +27,52 @@ export default function StudentAssignmentPerformancePage({
 }: { 
   params: { courseId: string, studentId: string, assignmentId: string } 
 }) {
-  const [student, setStudent] = useState<IUser | null>(null)
-  const [assignment, setAssignment] = useState<IAssignment | null>(null)
-  const [submissions, setSubmissions] = useState<ISubmission[]>([])
+  // State for current question index
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
-  const [loading, setLoading] = useState(true)
+  
   const router = useRouter()
   const { toast } = useToast()
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true)
-      try {
-        const [studentResponse, assignmentResponse] = await Promise.all([
-          userApi.getUserById(params.studentId),
-          assignmentApi.getAssignmentById(params.assignmentId),
-        ])
+  // Fetch data using React Query hooks
+  const { 
+    data: assignment,
+    isLoading: assignmentLoading,
+    error: assignmentError
+  } = useGetAssignmentById(params.assignmentId)
 
-        if (studentResponse.data) {
-          setStudent(studentResponse.data)
-        } else {
-          throw new Error(studentResponse.error?.error || 'Failed to fetch student data')
-        }
+  const {
+    data: submissions = [],
+    isLoading: submissionsLoading,
+    error: submissionsError
+  } = useGetSubmissionsByStudentIdAndAssignmentId(
+    params.studentId,
+    params.assignmentId
+  )
 
-        if (assignmentResponse.data) {
-          setAssignment(assignmentResponse.data)
-          
-          // Fetch submissions for each problem
-          const submissionPromises = assignmentResponse.data.problems.map(problem => 
-            submissionApi.getSubmissionByAssignmentProblemAndStudent(params.assignmentId, problem.id, params.studentId)
-          )
-          const submissionResponses = await Promise.all(submissionPromises)
-          const fetchedSubmissions = submissionResponses
-            .map(response => response.data)
-            .filter((submission): submission is ISubmission => submission !== null)
-          
-          setSubmissions(fetchedSubmissions)
-        } else {
-          throw new Error(assignmentResponse.error?.error || 'Failed to fetch assignment data')
-        }
+  const {
+    data: student,
+    isLoading: studentLoading,
+    error: studentError
+  } = useGetUserById(params.studentId)
 
-      } catch (err) {
-        toast({
-          title: "Error",
-          description: "Failed to fetch data. Please try again.",
-          variant: "destructive",
-        })
-        router.push(`/manage-courses/${params.courseId}/students/${params.studentId}`)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchData()
-  }, [params.courseId, params.studentId, params.assignmentId, router, toast])
-
-  if (loading) {
+  // Handle loading states
+  if (assignmentLoading || submissionsLoading || studentLoading) {
     return <div>Loading assignment data...</div>
   }
 
-  if (!student || !assignment) {
-    return <div>Student or assignment not found.</div>
+  // Handle errors
+  if (assignmentError || submissionsError || studentError || !assignment || !student) {
+    toast({
+      title: "Error",
+      description: "Failed to fetch data. Please try again.",
+      variant: "destructive",
+    })
+    router.push(`/manage-courses/${params.courseId}/students/${params.studentId}`)
+    return null
   }
 
   const currentProblem: IProblem | undefined = assignment.problems[currentQuestionIndex]
-  const currentSubmission = submissions.find(s => s.problemId === currentProblem?.id)
+  const currentSubmission = submissions.find(s => s.problemId.toString() === currentProblem?._id?.toString())
 
   const navigateQuestion = (direction: 'prev' | 'next') => {
     let newIndex = currentQuestionIndex
@@ -106,18 +85,18 @@ export default function StudentAssignmentPerformancePage({
   }
 
   const calculateEarnedPoints = (appliedRubricItemIds: string[] = []): number => {
-    return currentProblem?.rubric
-      .filter(item => appliedRubricItemIds.includes(item.id))
+    return currentProblem?.rubric.items
+      .filter(item => appliedRubricItemIds.includes(item._id?.toString() || ''))
       .reduce((sum, item) => sum + item.points, 0) || 0;
   }
 
   const calculateQuestionScores = (): QuestionScore[] => {
     if (!assignment) return [];
     return assignment.problems.map((problem, index) => {
-      const submission = submissions.find(s => s.problemId === problem.id);
+      const submission = submissions.find(s => s.problemId.toString() === problem._id?.toString());
       const score = submission
-        ? problem.rubric
-            .filter(item => submission.appliedRubricItemIds.includes(item.id))
+        ? problem.rubric.items
+            .filter(item => submission.appliedRubricItems?.includes(item._id))
             .reduce((sum, item) => sum + item.points, 0)
         : 0;
       return {
@@ -140,7 +119,7 @@ export default function StudentAssignmentPerformancePage({
         <Card className="flex-1">
           <CardHeader>
             <CardTitle>{assignment.title}</CardTitle>
-            <p className="text-sm text-muted-foreground">Student: {student.name}</p>
+            <p className="text-sm text-muted-foreground">Student: {student.name || student.email}</p>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -190,12 +169,12 @@ export default function StudentAssignmentPerformancePage({
                 <div>
                   <h3 className="font-semibold mb-2">Rubric:</h3>
                   <ul className="space-y-2">
-                    {currentProblem?.rubric.map((item) => {
-                      const isApplied = currentSubmission?.appliedRubricItemIds.includes(item.id);
+                    {currentProblem?.rubric.items.map((item: IRubricItem) => {
+                      const isApplied = currentSubmission?.appliedRubricItems?.includes(item._id);
                       const isPositive = item.points >= 0;
                       return (
                         <li
-                          key={item.id}
+                          key={item._id?.toString()}
                           className={`p-2 rounded-lg flex items-center justify-between ${
                             isApplied
                               ? isPositive
@@ -227,7 +206,7 @@ export default function StudentAssignmentPerformancePage({
                 <div className="flex justify-between items-center">
                   <h3 className="font-semibold">Points:</h3>
                   <p>
-                    {calculateEarnedPoints(currentSubmission?.appliedRubricItemIds)} / {currentProblem?.maxPoints || 0}
+                    {calculateEarnedPoints(currentSubmission?.appliedRubricItems?.map((id) => id.toString()))} / {currentProblem?.maxPoints || 0}
                   </p>
                 </div>
                 <Separator />
@@ -243,7 +222,7 @@ export default function StudentAssignmentPerformancePage({
                   <p>{currentSubmission?.graded ? 'Graded' : 'Not graded'}</p>
                   {currentSubmission?.graded && (
                     <>
-                      <p>Graded by: {currentSubmission.gradedBy}</p>
+                      {/* <p>Graded by: {currentSubmission.gradedBy}</p> */}
                       <p>Graded at: {currentSubmission.gradedAt?.toLocaleString()}</p>
                     </>
                   )}
@@ -256,4 +235,3 @@ export default function StudentAssignmentPerformancePage({
     </div>
   )
 }
-

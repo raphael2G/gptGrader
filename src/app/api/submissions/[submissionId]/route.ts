@@ -1,23 +1,19 @@
-// app/api/submissions/by-problem/[problemId]/route.ts
-import { NextResponse } from 'next/server';
+// app/api/submissions/[submissionId]/route.ts
+import { NextRequest, NextResponse } from 'next/server';
 import { Types } from 'mongoose';
-import { getSubmissionsByProblem } from '@/services/submissionServices';
+import { getSubmissionById } from '@/services/submissionServices';
 
-interface RouteParams {
-  params: {
-    problemId: string;
-  };
-}
-
-export async function GET(req: Request, { params }: RouteParams) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { submissionId: string } }
+) {
   try {
-    const problemId = new Types.ObjectId(params.problemId);
-    const submissions = await getSubmissionsByProblem(problemId);
-    return NextResponse.json(submissions);
+    const submissionId = new Types.ObjectId(params.submissionId);
+    const submission = await getSubmissionById(submissionId);
+    return NextResponse.json(submission);
   } catch (error) {
-    console.error('Failed to fetch problem submissions:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch problem submissions' },
+      { error: `Failed to fetch submission: ${error instanceof Error ? error.message : 'Unknown error'}` },
       { status: 500 }
     );
   }

@@ -99,7 +99,7 @@ export const discrepancyReportApi = {
     await simulateApiDelay();
     try {
       const reports = discrepancyReports.filter(report => report.assignmentId === assignmentId);
-      return { data: reports };
+      return reports;
     } catch (err) {
       console.error('Error fetching discrepancy reports by assignment:', err);
       return {

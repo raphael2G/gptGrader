@@ -11,8 +11,12 @@ import {
 import { useRouter } from 'next/navigation';
 import { useState } from 'react'
 import { useToast } from "@/components/ui/use-toast"
-import { llmApi } from '@/app/lib/client-api/LLM' // Import llmApi
+import { llmApi } from '@/app/lib/client-api/LLM'
 import { Loader2 } from 'lucide-react'
+import {
+  useGetAssignmentById, 
+} from '@/hooks/queries/useAssignments'
+import { useGetSubmissionsByProblemId } from '@/hooks/queries/useSubmissions'
 
 interface StepStatus {
   icon: React.ElementType;
@@ -30,76 +34,61 @@ const getGradingStatus = (progress: number): StepStatus => {
   return { icon: Circle, color: 'text-yellow-500' };
 }
 
-
-
-interface GradingProcessStepsProp {
+interface GradingProcessStepsProps {
+  courseId: string;
   assignmentId: string;
   problemId: string;
-  questionNumber: number;
-  referenceSolution?: string;
-  hasRubric: boolean;
-  isRubricFinalized: boolean;
-  onReferenceSolutionUpdate: (newSolution: string) => void;
-  onStartRubricCreation: () => void;
-  courseId: string;
-  params: {courseId: string, assignmentId: string, problemId: string};
-  gradingProgress: number; // 0 to 1, representing the fraction of graded submissions
 }
 
-export function GradingProcessSteps({ 
-  assignmentId, 
-  problemId, 
-  questionNumber, 
-  referenceSolution, 
-  hasRubric,
-  isRubricFinalized,
-  onReferenceSolutionUpdate,
-  onStartRubricCreation,
-  courseId,
-  params,
-  gradingProgress
-}: GradingProcessStepsProp) {
+export function GradingProcessSteps({ courseId, assignmentId, problemId }: GradingProcessStepsProps) {
+  // Hooks
   const router = useRouter();
-  const [grading, setGrading] = useState(); 
   const { toast } = useToast();
+  const [isGrading, setIsGrading] = useState(false);
   
-  const steps = [
-    {
-      title: "Add Reference Solution",
-      description: "Provide a reference solution for the problem.",
-      icon: PenTool,
-      status: getStepStatus(!!referenceSolution, { incomplete: 'text-gray-300', complete: 'text-green-500' })
-    },
-    {
-      title: "Initial Rubric Generation",
-      description: "Generate an initial rubric based on the reference solution.",
-      icon: Zap,
-      status: getStepStatus(
-        isRubricFinalized ? 'finalized' : (hasRubric ? 'inProgress' : false),
-        { incomplete: 'text-gray-300', complete: 'text-green-500' }
-      )
-    },
-    {
-      title: "Calibrate Rubric",
-      description: "Fine-tune and calibrate the rubric for accuracy.",
-      icon: Sliders,
-      status: getStepStatus(isRubricFinalized, { incomplete: 'text-gray-300', complete: 'text-green-500' }),
-      link: `/manage-courses/${courseId}/grading/${assignmentId}/${problemId}/calibration/setup`
-    },
-    {
-      title: "Grade Submissions",
-      description: "Grade all student submissions using the finalized rubric.",
-      icon: Check,
-      status: getGradingStatus(gradingProgress),
-      link: `/manage-courses/${courseId}/grading/${assignmentId}/${problemId}/grade`
-    },
-  ]
-  
-  const handleGradeAllSubmissions = async () => {
-    setGrading(true);
+  // Data fetching
+  const { data: assignment, isLoading: assignmentLoading } = useGetAssignmentById(assignmentId);
+  const { data: submissions = [], isLoading: submissionsLoading } = useGetSubmissionsByProblemId(problemId);
 
+
+  // Derived state
+  const problem = assignment?.problems.find(p => p._id?.toString() === problemId);
+
+  // Loading state
+  if (assignmentLoading || submissionsLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-[200px]">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  // Error state
+  if (!assignment || !problem) {
+    return (
+      <div className="text-center text-red-500">
+        Error loading assignment data
+      </div>
+    );
+  }
+
+  // derived states 2
+  const questionNumber = problem?.orderIndex ?? 0;
+  const hasRubric = problem?.rubric.items.length > 0;
+  const isRubricFinalized = problem?.rubricFinalized ?? false;
+  const gradingProgress = submissions.length > 0 
+    ? submissions.filter(s => s.graded).length / submissions.length 
+    : 0;
+
+  const handleStartRubricCreation = () => {
+    router.push(`/manage-courses/${assignment.courseId}/grading/${assignmentId}/${problemId}/setup/make-rubric`);
+  };
+
+
+
+  const handleGradeAllSubmissions = async () => {
+    setIsGrading(true);
     try {
-     
       const response = await llmApi.gradeAllSubmissions(problemId);
       if (response.data?.success) {
         toast({
@@ -116,9 +105,42 @@ export function GradingProcessSteps({
         variant: "destructive",
       });
     } finally {
-      setGrading(false);
+      setIsGrading(false);
     }
   };
+
+  const steps = [
+    {
+      title: "Add Reference Solution",
+      description: "Provide a reference solution for the problem.",
+      icon: PenTool,
+      status: getStepStatus(!!problem.referenceSolution, { incomplete: 'text-gray-300', complete: 'text-green-500' })
+    },
+    {
+      title: "Initial Rubric Generation",
+      description: "Generate an initial rubric based on the reference solution.",
+      icon: Zap,
+      status: getStepStatus(
+        isRubricFinalized ? 'finalized' : (hasRubric ? 'inProgress' : false),
+        { incomplete: 'text-gray-300', complete: 'text-green-500' }
+      ), 
+      link: `/manage-courses/${courseId}/grading/${assignmentId}/${problemId}/setup/make-rubric`
+    },
+    {
+      title: "Calibrate Rubric",
+      description: "Fine-tune and calibrate the rubric for accuracy.",
+      icon: Sliders,
+      status: getStepStatus(isRubricFinalized, { incomplete: 'text-gray-300', complete: 'text-green-500' }),
+      link: `/manage-courses/${assignment.courseId}/grading/${assignmentId}/${problemId}/calibration/setup`
+    },
+    {
+      title: "Grade Submissions",
+      description: "Grade all student submissions using the finalized rubric.",
+      icon: Check,
+      status: getGradingStatus(gradingProgress),
+      link: `/manage-courses/${assignment.courseId}/grading/${assignmentId}/${problemId}/grade`
+    },
+  ];
 
   return (
     <Card className="w-full max-w-3xl mx-auto">
@@ -143,9 +165,6 @@ export function GradingProcessSteps({
                     <ReferenceSolutionDialog
                       assignmentId={assignmentId}
                       problemId={problemId}
-                      questionNumber={questionNumber}
-                      initialSolution={referenceSolution}
-                      onUpdate={onReferenceSolutionUpdate}
                     />
                   </div>
                 )}
@@ -156,15 +175,15 @@ export function GradingProcessSteps({
                         <TooltipTrigger asChild>
                           <span className="w-full">
                             <Button 
-                              onClick={referenceSolution ? onStartRubricCreation : undefined} 
-                              variant={referenceSolution ? "default" : "secondary"}
-                              className={`w-full ${!referenceSolution ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              onClick={problem.referenceSolution ? handleStartRubricCreation : undefined} 
+                              variant={problem.referenceSolution ? "default" : "secondary"}
+                              className={`w-full ${!problem.referenceSolution ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                               {hasRubric ? "View Rubric" : "Start Rubric Generation" }
                             </Button>
                           </span>
                         </TooltipTrigger>
-                        {!referenceSolution && (
+                        {!problem.referenceSolution && (
                           <TooltipContent>
                             <p>Add a reference solution before creating the rubric</p>
                           </TooltipContent>
@@ -184,7 +203,6 @@ export function GradingProcessSteps({
                               disabled={!hasRubric}
                               variant={hasRubric ? "default" : "secondary"}
                               className={`w-full ${!hasRubric ? 'opacity-50 cursor-not-allowed' : ''}`}
-                              
                             >
                               Calibrate Rubric
                             </Button>
@@ -211,13 +229,14 @@ export function GradingProcessSteps({
                               variant={isRubricFinalized ? "default" : "secondary"}
                               className={`w-full ${!isRubricFinalized ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
-                              {grading ? (
-                                  <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Grading submissions... Please don't refresh the page.
-                                  </>
-                                ) : ("Grade Assignment")
-                              }
+                              {isGrading ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Grading submissions... Please don't refresh the page.
+                                </>
+                              ) : (
+                                "Grade Assignment"
+                              )}
                             </Button>
                           </span>
                         </TooltipTrigger>
@@ -236,6 +255,5 @@ export function GradingProcessSteps({
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }
-

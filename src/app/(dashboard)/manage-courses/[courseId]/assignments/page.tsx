@@ -29,6 +29,7 @@ import {
  } from '@/hooks/queries/useAssignments'
 
 function AssignmentCard({ assignment }: { assignment: IAssignment }) {
+  console.log("assignment: ", assignment)
   return (
     <Link href={`/manage-courses/${assignment.courseId.toString()}/assignments/${assignment._id.toString()}`}>
       <Card className="h-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
@@ -59,8 +60,6 @@ function AssignmentCard({ assignment }: { assignment: IAssignment }) {
 }
 
 export default function AssignmentsPage({ params }: { params: { courseId: string } }) {
-  // const [assignments, setAssignments] = useState<IAssignment[]>([])
-  // const [loading, setLoading] = useState(true)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [newAssignment, setNewAssignment] = useState<Partial<IAssignment>>({
     title: '',
@@ -109,6 +108,14 @@ export default function AssignmentsPage({ params }: { params: { courseId: string
 
 
 const handleAddAssignment = () => {
+  if (!newAssignment.lateDueDate || !newAssignment.dueDate || newAssignment.lateDueDate < newAssignment.dueDate) {
+    toast({
+      title: "Validation Error",
+      description: "Late due date cannot be before the due date.",
+      variant: "destructive",
+    })
+    return false
+  }
   createAssignment(
     {
       courseId: params.courseId,
@@ -140,36 +147,6 @@ const handleAddAssignment = () => {
     }
   );
 };
-
-
-  // const handleAddAssignment = async () => {
-  //   try {
-  //     const response = await assignmentApi.createAssignment(params.courseId, newAssignment as IAssignment)
-  //     if (response.data) {
-  //       setAssignments([...assignments, response.data])
-  //       setIsAddDialogOpen(false)
-  //       setNewAssignment({
-  //         title: '',
-  //         description: '',
-  //         dueDate: new Date(),
-  //         finalSubmissionDeadline: new Date(),
-  //         problems: []
-  //       })
-  //       toast({
-  //         title: "Success",
-  //         description: "Assignment added successfully.",
-  //       })
-  //     } else {
-  //       throw new Error(response.error?.error || 'Failed to add assignment')
-  //     }
-  //   } catch (err) {
-  //     toast({
-  //       title: "Error",
-  //       description: "Failed to add assignment. Please try again.",
-  //       variant: "destructive",
-  //     })
-  //   }
-  // }
 
 
   return (
@@ -235,7 +212,7 @@ const handleAddAssignment = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {assignments.map((assignment) => (
-            <AssignmentCard key={assignment._id} assignment={assignment} />
+            <AssignmentCard key={assignment._id.toString()} assignment={assignment} />
           ))}
         </div>
       )}

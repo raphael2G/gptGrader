@@ -1,5 +1,5 @@
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
-import { IProblem } from '@@/models/Assignment'
+import { IProblem } from '@/models/Assignment'
 
 interface QuestionAndReferenceSolutionProps {
   problem: IProblem;

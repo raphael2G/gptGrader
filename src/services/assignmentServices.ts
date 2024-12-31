@@ -7,7 +7,8 @@ import {
   upsertProblemQuery,
   deleteProblemQuery,
   upsertRubricItemQuery,
-  deleteRubricItemQuery
+  deleteRubricItemQuery,
+  updateProblemReferenceSolutionQuery
 } from '@/queries/assignmentQueries';
 import { IAssignment, IProblem, IRubricItem } from '@/models/Assignment';
 
@@ -74,11 +75,34 @@ export async function upsertProblem(
   assignmentId: Types.ObjectId,
   problemData: Partial<IProblem>
 ) {
+
+
   try {
     const updatedAssignment = await upsertProblemQuery(assignmentId, problemData);
+
     return updatedAssignment;
   } catch (error) {
+
     throw new Error(`Failed to upsert problem: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+
+export async function updateProblemReferenceSolution(
+  assignmentId: Types.ObjectId,
+  problemId: Types.ObjectId,
+  referenceSolution: string
+) {
+  try {
+    const updatedAssignment = await updateProblemReferenceSolutionQuery(
+      assignmentId,
+      problemId,
+      referenceSolution
+    );
+
+    return updatedAssignment;
+  } catch (error) {
+    throw new Error(`Failed to update reference solution: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
