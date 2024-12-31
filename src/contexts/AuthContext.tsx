@@ -3,60 +3,84 @@ import { useContext, createContext, useState, useEffect } from "react";
 import { signInWithPopup, signOut, onAuthStateChanged, GoogleAuthProvider } from "@firebase/auth";
 import { FireAuth } from "@/firebase/firebase";
 import { Types } from "mongoose";
+import { useCreateUser } from "@/hooks/queries/useUsers";
+
 
 interface AuthContext {
   user: User | null;
-  googleSignIn: () => void;
-  logOut: () => void;
+  googleSignIn: () => Promise<void>; // Make these async
+  logOut: () => Promise<void>;
   loading: boolean;
 }
+
 
 interface User {
   // Essential Firebase Auth fields
   uid: string;
   email: string | null;
   displayName: string | null;
-  photoURL: string | null;
   
   // MongoDB ID
   _id: Types.ObjectId;
 }
 
-const AuthContext = createContext<AuthContext>({
+// Separate the initial context value
+const INITIAL_CONTEXT: AuthContext = {
   user: null,
-  googleSignIn: () => {},
-  logOut: () => {},
+  googleSignIn: async () => {},
+  logOut: async () => {},
   loading: true,
-});
-
-export const UserAuth = () => {
-  return useContext(AuthContext);
 };
+
+const AuthContext = createContext<AuthContext>(INITIAL_CONTEXT);
 
 export const AuthContextProvider = ({ children }: any) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const googleSignIn = () => {
-    const provider = new GoogleAuthProvider();
-    signInWithPopup(FireAuth, provider);
+  const { mutateAsync: createUser, isPending: isCreatingUser } = useCreateUser();
+
+  const googleSignIn = async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(FireAuth, provider);
+    } catch (error) {
+      console.error('Google sign in error:', error);
+      throw error;
+    }
   };
 
-  const logOut = () => {
-    signOut(FireAuth);
+  const logOut = async () => {
+    try {
+      await signOut(FireAuth);
+      setUser(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+      throw error;
+    }
   };
 
   // Function to get MongoDB _id from Firebase UID
-  const fetchMongoId = async (firebaseUid: string) => {
+  const fetchOrCreateMongoId = async (firebaseUser: Omit<User, "_id">) => {
     try {
-      const response = await fetch(`/api/users/lookup?firebaseUid=${firebaseUid}`);
+
+      // first, look up to see if a user exists
+      const lookupResponse = await fetch(`/api/users/lookup?firebaseUid=${firebaseUser.uid}`);
+      const lookupData = await lookupResponse.json()
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch user');
+      // If user exists, return their MongoDB _id
+      if (lookupResponse.ok && lookupData.data) {
+        return lookupData.data._id;
       }
 
-      const data = await response.json();
-      return data.data._id;
+      // otherwise, create a new user
+      const newUser = await createUser({
+        firebaseUid: firebaseUser.uid,
+        email: firebaseUser.email || "",
+        name: firebaseUser.displayName || ""
+      });
+
+      return newUser._id
     } catch (error) {
       console.error('Error fetching MongoDB _id:', error);
       return null;
@@ -65,14 +89,20 @@ export const AuthContextProvider = ({ children }: any) => {
   
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(FireAuth, async (currentUser) => {
-      if (currentUser) {
-        setLoading(true);
-        const mongoId = await fetchMongoId(currentUser.uid)
-        setUser({...currentUser, _id: mongoId});
-      } else {
+      try {
+        if (currentUser) {
+          setLoading(true);
+          const mongoId = await fetchOrCreateMongoId(currentUser)
+          setUser({...currentUser, _id: mongoId});
+        } else {
+          setUser(null);
+        } 
+      } catch (error) {
+        console.error('Auth state change error:', error);
         setUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
     return () => unsubscribe();
   }, []);
@@ -86,4 +116,10 @@ export const AuthContextProvider = ({ children }: any) => {
 
 
 
-
+export const UserAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('UserAuth must be used within an AuthContextProvider');
+  }
+  return context;
+};

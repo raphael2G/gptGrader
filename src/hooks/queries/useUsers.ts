@@ -1,11 +1,58 @@
 // hooks/queries/useUser.ts
-import { useQueries, useQuery } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
 import { getQueryConfig } from './config';
 import { queryKeys } from './queryKeys';
 
 import { userApi } from '@/api-client/endpoints/users';
 import { ICourse } from '@/models/Course';
 import { IUser } from '@/models/User';
+
+
+interface CreateUserParams {
+  firebaseUid: string;
+  email: string;
+  name?: string;
+}
+
+/**
+ * React Query mutation hook for creating a new user
+ * 
+ * @returns UseMutationResult for creating a user from Firebase auth data
+ * 
+ * @example
+ * ```tsx
+ * const { mutate: createUser, isLoading } = useCreateUser();
+ * 
+ * const handleCreateUser = () => {
+ *   createUser(
+ *     {
+ *       firebaseUid: firebaseUser.uid,
+ *       email: firebaseUser.email,
+ *       name: firebaseUser.displayName
+ *     },
+ *     {
+ *       onSuccess: (data) => {
+ *         console.log('User created:', data);
+ *       },
+ *       onError: (error) => {
+ *         console.error('Failed to create user:', error);
+ *       }
+ *     }
+ *   );
+ * };
+ * ```
+ */
+export function useCreateUser() {
+  return useMutation<IUser, Error, CreateUserParams>({
+    mutationFn: async ({ firebaseUid, email, name }) => {
+      const response = await userApi.create(firebaseUid, email, name);
+      if (!response.data) {
+        throw new Error(response.error?.error || 'Failed to create user');
+      }
+      return response.data;
+    }
+  });
+}
 
 export function useGetUserById(userId: string, options?: any) {
 
