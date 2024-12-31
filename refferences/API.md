@@ -160,69 +160,26 @@ app/api/assignments/
 
 ### Submission Management
 ```
-    └── submissions/                  # Submission endpoints
-        ├── route.ts                  # Submit answers
-        └── [submissionId]/          # Submission-specific operations
-            └── route.ts              # Get/update submissions
+app/api/submissions/
+├── route.ts                          # POST: upsertSubmission
+├── [submissionId]/
+│   ├── route.ts                      # GET: getSubmissionById
+│   │                                 # PATCH: updateSubmission
+│   └── grade/
+│       └── route.ts                  # PATCH: updateGrading
+│   └── self-grade/
+│       └── route.ts                  # PATCH: updateSelfGrading
+├── student/
+│   └── [studentId]/
+│       └── route.ts                  # GET: getSubmissionsByStudent
+├── assignment/
+│   └── [assignmentId]/
+│       └── route.ts                  # GET: getSubmissionsByAssignment
+└── problem/
+    └── [problemId]/
+        └── route.ts                  # GET: getSubmissionsByProblem
 ```
 
 Each `route.ts` file contains handlers for HTTP methods (GET, POST, PATCH, DELETE) appropriate for that endpoint. The handlers validate requests, authenticate users, call the corresponding service functions, and return formatted responses.
 
 
-### Overview of Entire File Tree
-```
-app/
-└── api/
-    ├── users/
-    │   ├── route.ts                       # POST: createUser
-    │   ├── [userId]/
-    │   │   └── route.ts                   # GET: getUser
-    │   └── [userId]/courses/
-    │       └── route.ts                   # GET: getStudentCourses, getInstructorCourses
-    │                                      # (with ?role= query param)
-    │
-    ├── courses/
-    │   ├── route.ts                       # GET: listCourses
-    │   │                                  # POST: createCourse
-    │   │
-    │   └── [courseId]/
-    │       ├── route.ts                   # GET: getCourse
-    │       │                              # PATCH: updateCourseDetails
-    │       │
-    │       ├── students/
-    │       │   ├── route.ts               # POST: addStudent
-    │       │   └── [studentId]/
-    │       │       └── route.ts           # DELETE: removeStudent
-    │       │
-    │       ├── instructors/
-    │       │   ├── route.ts               # POST: addInstructor
-    │       │   └── [instructorId]/
-    │       │       └── route.ts           # DELETE: removeInstructor
-    │       │
-    │       └── assignments/
-    │           └── route.ts               # GET: getCourseAssignments
-    │
-    ├── assignments/
-    │   ├── route.ts                       # POST: createAssignment
-    │   │
-    │   └── [assignmentId]/
-    │       ├── route.ts                   # GET: getAssignment
-    │       │                              # PATCH: updateAssignment
-    │       │                              # DELETE: deleteAssignment
-    │       │
-    │       ├── problems/
-    │       │   ├── route.ts               # POST: upsertProblem
-    │       │   └── [problemId]/
-    │       │       └── route.ts           # DELETE: deleteProblem
-    │       │
-    │       └── rubric-items/
-    │           ├── route.ts               # POST: upsertRubricItem
-    │           └── [itemId]/
-    │               └── route.ts           # DELETE: deleteRubricItem
-    │
-    └── submissions/
-        ├── route.ts                       # POST: submitAnswer
-        └── [submissionId]/
-            └── route.ts                   # GET: getSubmission
-                                          # PATCH: updateSubmission (grading)
-```
