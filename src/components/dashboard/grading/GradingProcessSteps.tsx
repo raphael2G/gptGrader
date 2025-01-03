@@ -1,6 +1,7 @@
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { CheckCircle, Circle, PenTool, Zap, Sliders, Check } from 'lucide-react'
 import { ReferenceSolutionDialog } from '@/components/dashboard/grading/ReferenceSolutionDialog'
+import { GradeAllSubmissionConfirmation } from '@/components/dashboard/grading/GradeAllSubmissionsConfirmationDialog'
 import { Button } from "@/components/ui/button"
 import {
   Tooltip,
@@ -85,31 +86,7 @@ export function GradingProcessSteps({ courseId, assignmentId, problemId }: Gradi
 
 
 
-  const handleGradeAllSubmissions = async () => {
-    setIsGrading(true);
-    try {
-      const response = await new Promise(resolve => setTimeout(() => {
-        resolve({
-          // Mock response structure to match what the API would return
-          data: {
-            success: true
-          }
-        });
-        }, 5000)); // 5000 milliseconds = 5 seconds      if (response.data?.success) {
-        toast({
-          title: "Success",
-          description: "Submissions graded successfully!",
-        });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to grade submissions. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsGrading(false);
-    }
-  };
+
 
   const steps = [
     {
@@ -225,21 +202,9 @@ export function GradingProcessSteps({ courseId, assignmentId, problemId }: Gradi
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <span className="w-full">
-                            <Button
-                              onClick={handleGradeAllSubmissions}
-                              disabled={!isRubricFinalized}
-                              variant={isRubricFinalized ? "default" : "secondary"}
-                              className={`w-full ${!isRubricFinalized ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                              {isGrading ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Grading submissions... Please don't refresh the page.
-                                </>
-                              ) : (
-                                "Grade Assignment"
-                              )}
-                            </Button>
+                            <GradeAllSubmissionConfirmation 
+                              isRubricFinalized={isRubricFinalized}
+                            />
                           </span>
                         </TooltipTrigger>
                         {!isRubricFinalized && (
