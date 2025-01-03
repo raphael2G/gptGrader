@@ -18,6 +18,7 @@ import { useGetAssignmentById } from '@/hooks/queries/useAssignments'
 import { 
   useGetSubmissionById, 
   useGetSubmissionsByAssignmentId,
+  useGetSubmissionsByAssignmentIdAndProblemId,
   useUpdateSubmissionGrading 
 } from '@/hooks/queries/useSubmissions'
 
@@ -54,7 +55,7 @@ export default function GradeSubmissionPage({
     data: allSubmissions = [],
     isLoading: allSubmissionsLoading,
     error: allSubmissionsError
-  } = useGetSubmissionsByAssignmentId(params.assignmentId)
+  } = useGetSubmissionsByAssignmentIdAndProblemId(params.assignmentId, params.problemId)
 
   // Setup mutation for updating submission grading
   const { mutate: updateGrading } = useUpdateSubmissionGrading()
@@ -135,7 +136,7 @@ export default function GradeSubmissionPage({
             <Card className="overflow-hidden">
               <CardContent className="p-6">
                 <h3 className="text-xl font-semibold text-primary mb-4">Rubric</h3>
-                <RubricGrading />
+                <RubricGrading currentSubmission={submission} allowAiFeedback={true}/>
               </CardContent>
             </Card>
           </div>
