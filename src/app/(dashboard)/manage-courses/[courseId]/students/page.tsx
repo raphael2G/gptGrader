@@ -19,7 +19,7 @@ export default function StudentsPage({ params }: { params: { courseId: string } 
 
   return (
     <div className="space-y-6">
-      <BackButton />
+      <BackButton backLink={`/manage-courses/${params.courseId}`} />
       <h1 className="text-3xl font-bold">Students in {course.title}</h1>
       <Suspense fallback={<div>Loading class performance...</div>}>
         <ClassPerformanceVisualization courseId={course._id.toString()} />

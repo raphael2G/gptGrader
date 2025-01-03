@@ -30,7 +30,7 @@ export default function CourseManagementPage({ params }: { params: { courseId: s
 
   return (
     <div className="space-y-6">
-      <BackButton />
+      <BackButton backLink={`/manage-courses`}/>
       <h1 className="text-3xl font-bold">Manage Course: {course.title}</h1>
       
       <Card>

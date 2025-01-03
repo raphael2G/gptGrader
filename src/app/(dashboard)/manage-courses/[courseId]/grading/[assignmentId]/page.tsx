@@ -62,7 +62,7 @@ export default function AssignmentGradingPage({
 
   return (
     <div className="space-y-6">
-      <BackButton />
+      <BackButton backLink={`/manage-courses/${params.courseId}/grading`}/>
       <h1 className="text-3xl font-bold">Grading: {assignment.title}</h1>
       
       <Card>

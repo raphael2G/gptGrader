@@ -109,7 +109,7 @@ export default function StudentAssignmentPerformancePage({
 
   return (
     <div className="space-y-6">
-      <BackButton />
+      <BackButton backLink={`/manage-courses/${params.courseId}/students/${params.studentId}`} />
       <div className="flex gap-6">
         <CollapsibleQuestionScoreChart
           scores={calculateQuestionScores()}

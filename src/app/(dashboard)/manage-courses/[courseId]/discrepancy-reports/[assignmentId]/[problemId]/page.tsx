@@ -61,7 +61,7 @@ export default function ProblemDiscrepancyReportPage({
 
   return (
     <div className="space-y-6">
-      <BackButton />
+      <BackButton backLink={`/manage-courses/${courseId}/discrepancy-reports/${assignmentId}`}/>
       <h1 className="text-3xl font-bold">Discrepancy Reports: {assignment.title}</h1>
       <h2 className="text-2xl font-semibold">Problem {problem.question}</h2>
 

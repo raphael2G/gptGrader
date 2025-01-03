@@ -72,7 +72,7 @@ export default function DiscrepancyReportsPage({ params }: { params: { courseId:
 
   return (
     <div className="space-y-6">
-      <BackButton />
+      <BackButton backLink={`/manage-courses/${params.courseId}`}/>
       <h1 className="text-3xl font-bold">Discrepancy Reports</h1>
 
       <Card className="w-full h-64">

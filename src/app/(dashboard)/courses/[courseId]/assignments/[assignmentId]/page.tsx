@@ -96,7 +96,8 @@ export default function AssignmentPage({ params }: { params: { courseId: string,
 
   return (
     <div className="space-y-6">
-      <BackButton />
+        <BackButton backLink={`/courses/${params.courseId}`}/>
+
       <div>
         <h1 className="text-3xl font-bold">{assignment.title}</h1>
         <p className="text-xl text-muted-foreground mt-2">

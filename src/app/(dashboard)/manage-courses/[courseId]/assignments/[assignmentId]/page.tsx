@@ -34,7 +34,7 @@ export default function AssignmentDetailsPage({ params }: { params: { courseId: 
 
   return (
     <div className="space-y-6">
-      <BackButton />
+      <BackButton backLink={`/manage-courses/${params.courseId}/assignments`}/>
       <h1 className="text-3xl font-bold">Assignment Details: {assignment.title}</h1>
       <AssignmentDetails assignmentId={assignment._id.toString()}/>
       <ProblemList assignmentId={assignment._id.toString()}/>

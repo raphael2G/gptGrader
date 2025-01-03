@@ -91,7 +91,7 @@ export default function GradingPage({ params }: { params: { courseId: string } }
 
   return (
     <div className="space-y-6">
-      <BackButton />
+      <BackButton backLink={`/manage-courses/${params.courseId}`}/>
       <h1 className="text-3xl font-bold">Grading: {course.title}</h1>
       <Card>
         <CardHeader>

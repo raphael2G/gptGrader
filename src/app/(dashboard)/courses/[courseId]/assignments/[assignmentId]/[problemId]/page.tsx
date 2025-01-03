@@ -37,7 +37,7 @@ export default function ProblemPage({params}: { params: { courseId: string, assi
 
   return (
     <div className="space-y-6">
-      <BackButton />
+      <BackButton backLink={`/courses/${params.courseId}/assignments/${params.assignmentId}`}/>
       {assignment.areGradesReleased ? (
         <GradedProblemView
           courseId={params.courseId}

@@ -81,7 +81,7 @@ export default function AssignmentDiscrepancyReportsPage({
 
   return (
     <div className="space-y-6">
-      <BackButton />
+      <BackButton backLink={`/manage-courses/${params.courseId}/discrepancy-reports`}/>
       <h1 className="text-3xl font-bold">
         Discrepancy Reports: {assignment?.title || 'Untitled Assignment'}
       </h1>

@@ -87,21 +87,11 @@ export default function AssignmentsPage({ params }: { params: { courseId: string
   if (isGettingCourse) return <div>Fetching course data...</div>
   if (isGettingAssignments) return <div>Fetching assignments data...</div>
   if (errorGettingCourse) {
-    toast({
-      title: "Something went wrong loading this course.",
-      description: errorGettingCourse?.message || "Please try again later",
-      variant: "destructive"
-    })
-    router.push("/manage-courses")
+    // router.push("/manage-courses")
     return <div>There was an issue getting your course. {errorGettingCourse?.message}</div>;
   }
   if (errorGettingAssignments) {
-    toast({
-      title: "Something went wrong getting the assignments for this course.",
-      description: errorGettingAssignments?.message || "Please try again later",
-      variant: "destructive"
-    })
-    router.push("/manage-courses")
+    // router.push("/manage-courses")
     return <div>There was an issue getting your assignments for this course. {errorGettingAssignments?.message}</div>;
   }
 
@@ -150,7 +140,7 @@ const handleAddAssignment = () => {
 
   return (
     <div className="space-y-6">
-      <BackButton backLink={'/manage-courses'}/>
+      <BackButton backLink={`/manage-courses/${params.courseId}`}/>
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Assignments</h1>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>

@@ -116,7 +116,7 @@ export default function StudentPerformancePage({ params }: { params: { courseId:
 
   return (
     <div className="space-y-6">
-      <BackButton />
+      <BackButton backLink={`/manage-courses/${params.courseId}/students`} />
       <div>
         <h1 className="text-3xl font-bold">Student Performance Dashboard</h1>
         <h2 className="text-xl text-muted-foreground">Course: {course.title}</h2>

@@ -40,7 +40,7 @@ export default function CoursePage({ params }: { params: { courseId: string } })
       <div className="text-center">
         <h1 className="text-2xl font-bold text-red-500 mb-4">Error</h1>
         <p className="text-lg text-gray-600 dark:text-gray-400">{fetchingCourseError?.message || 'There was an issue fetching your course...'}</p>
-        <BackButton />
+        <BackButton backLink='/courses'/>
       </div>
     )
   }
@@ -50,7 +50,7 @@ export default function CoursePage({ params }: { params: { courseId: string } })
       <div className="text-center">
         <h1 className="text-2xl font-bold text-red-500 mb-4">Error</h1>
         <p className="text-lg text-gray-600 dark:text-gray-400">{fetchingAssignmentsError?.message || 'There was an issue fetching your assignments...'}</p>
-        <BackButton />
+        <BackButton backLink='/courses'/>
       </div>
     )
   }
@@ -59,7 +59,7 @@ export default function CoursePage({ params }: { params: { courseId: string } })
 
   return (
     <div className="space-y-6">
-      <BackButton />
+        <BackButton backLink='/courses'/>
       <div className="space-y-2">
         <h1 className="text-3xl font-bold">{course.title}</h1>
         <p className="text-xl text-muted-foreground">{course.description}</p>
