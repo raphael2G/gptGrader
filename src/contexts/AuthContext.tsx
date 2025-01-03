@@ -107,7 +107,14 @@ export const AuthContextProvider = ({ children }: any) => {
     return () => unsubscribe();
   }, []);
 
+  if (loading){
+    return <div>loading...</div>
+  }
+
+
+
   return (
+    
     <AuthContext.Provider value={{ user, googleSignIn, logOut, loading }}>
       {children}
     </AuthContext.Provider>
