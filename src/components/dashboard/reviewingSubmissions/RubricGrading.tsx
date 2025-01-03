@@ -23,8 +23,16 @@ import {
 import { IRubricItem } from '@/models/Assignment'
 import { Types } from 'mongoose'
 import debounce from 'lodash/debounce'
+import { ISubmission } from '@/models/Submission'
 
-export function RubricGrading() {
+interface RubricGradingParams {
+  currentSubmission: ISubmission;
+  allowRubricEdit?: boolean;
+  allowAiFeedback?: boolean;
+
+}
+
+export function RubricGrading({currentSubmission, allowAiFeedback=false, allowRubricEdit=false}: RubricGradingParams) {
   // Get params and context
   const params = useParams()
   const { user } = UserAuth()
@@ -44,14 +52,10 @@ export function RubricGrading() {
 
   // Queries
   const { data: assignment, isLoading: assignmentLoading } = useGetAssignmentById(assignmentId)
-  const { data: submissions } = useGetSubmissionsByAssignmentIdAndProblemId(
-    assignmentId,
-    problemId
-  )
 
   // Get current problem and submission
   const problem = assignment?.problems.find(p => p._id?.toString() === problemId)
-  const currentSubmission = submissions?.[0]
+
   const rubricItems = problem?.rubric.items || []
 
   // Mutations
@@ -60,32 +64,37 @@ export function RubricGrading() {
 
   // Event handlers
   const handleCheckboxChange = (itemId: string) => {
-    if (!currentSubmission) return;
+    toast({
+      title: "Uh oh. You can't change these items by clicking!",
+      description: "You can only change if a rubric item is applied or not by resolving a discrepancy report, or giving AI model feedback.",
+      variant: "destructive" 
+    })
+    // if (!currentSubmission) return;
 
-    const currentItems = currentSubmission.appliedRubricItems?.map(id => id.toString()) || [];
-    const updatedItems = currentItems.includes(itemId)
-      ? currentItems.filter(id => id !== itemId)
-      : [...currentItems, itemId];
+    // const currentItems = currentSubmission.appliedRubricItems?.map(id => id.toString()) || [];
+    // const updatedItems = currentItems.includes(itemId)
+    //   ? currentItems.filter(id => id !== itemId)
+    //   : [...currentItems, itemId];
   
-    updateGrading(
-      {
-        submissionId: currentSubmission._id.toString(),
-        gradingData: {
-          gradedBy: user?._id?.toString() || '',
-          appliedRubricItems: updatedItems,
-          feedback: currentSubmission.feedback || ''
-        }
-      },
-      {
-        onError: (error) => {
-          toast({
-            title: "Error",
-            description: error.message || "Failed to update grading",
-            variant: "destructive"
-          });
-        }
-      }
-    );
+    // updateGrading(
+    //   {
+    //     submissionId: currentSubmission._id.toString(),
+    //     gradingData: {
+    //       gradedBy: user?._id?.toString() || '',
+    //       appliedRubricItems: updatedItems,
+    //       feedback: currentSubmission.feedback || ''
+    //     }
+    //   },
+    //   {
+    //     onError: (error) => {
+    //       toast({
+    //         title: "Error",
+    //         description: error.message || "Failed to update grading",
+    //         variant: "destructive"
+    //       });
+    //     }
+    //   }
+    // );
   };
 
   const handleFeedbackChange = useCallback(
@@ -114,6 +123,63 @@ export function RubricGrading() {
     }, 500),
     [currentSubmission, updateGrading, user?._id]
   );
+
+  // const handleAIFeedbackChange = (itemId: string, feedback: string, shouldApply: 'should' | 'should-not' | 'correct') => {
+    // setFeedbackItemId(null);
+    // setAIFeedback('');
+    // setAiShouldApply(null);
+  //   toast({
+  //     title: "Succesfully noted this down.",
+  //     description: "Actually we did not do anything."
+  //   })
+  // };
+
+  const handleAIFeedbackChange = (itemId: string) => {
+
+
+    const isCurrentlySelected = currentSubmission.appliedRubricItems?.some(
+      (appliedId) => appliedId.toString() === itemId
+    );
+  
+    const updatedItems = isCurrentlySelected
+      ? currentSubmission.appliedRubricItems?.map(id=>id.toString()).filter((id) => id.toString() !== itemId) || []
+      : [...(currentSubmission?.appliedRubricItems?.map(id => id.toString()) || []), itemId];
+  
+    updateGrading(
+      {
+        submissionId: currentSubmission._id.toString(),
+        gradingData: {
+          gradedBy: user?._id?.toString() || '',
+          appliedRubricItems: updatedItems,
+          feedback: currentSubmission.feedback || '',
+        },
+      },
+      {
+        onSuccess: () => {
+          setFeedbackItemId(null);
+          setAiShouldApply(null);
+          setAIFeedback('');
+          toast({
+            title: 'AI Feedback Submitted. Please update the rubric to avoid this error in the future.',
+            description: 'Rubric item selection updated based on feedback.',
+          });
+        },
+        onError: (error) => {
+          toast({
+            title: 'Error',
+            description: error.message || 'Failed to update rubric item selection.',
+            variant: 'destructive',
+          });
+        },
+      }
+    );
+
+
+    setFeedbackItemId(null);
+    setAIFeedback('');
+    setAiShouldApply(null);
+  };
+  
 
   const handleEditStart = (item: IRubricItem) => {
     setEditingItemId(item._id?.toString() || null)
@@ -174,8 +240,8 @@ export function RubricGrading() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-3">
+    <div className="space-y-3">
+      <div className="space-y-1">
         {rubricItems.map((item) => {
           const itemId = item._id?.toString() || '';
           const isChecked = currentSubmission?.appliedRubricItems?.some(
@@ -188,7 +254,7 @@ export function RubricGrading() {
             <div key={itemId}>
               <motion.div
                 className={cn(
-                  "flex items-center space-x-3 p-4 rounded-md transition-colors",
+                  "flex items-center space-x-3 p-2 m-2 rounded-md transition-colors",
                   isChecked && isPositive && "bg-green-100 dark:bg-green-900/30 border-2 border-green-500",
                   isChecked && !isPositive && "bg-red-100 dark:bg-red-900/30 border-2 border-red-500",
                   !isChecked && "bg-muted hover:bg-muted/80 dark:hover:bg-muted/50"
@@ -196,12 +262,20 @@ export function RubricGrading() {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
+                <span className={cn(
+                      "font-semibold text-xs p-0 m-0",
+                      isPositive ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"
+                    )}>
+                      {item.points > 0 ? '+' : ''}{item.points.toFixed(1)}
+                    </span>
                 <Checkbox
                   id={itemId}
                   checked={isChecked}
                   onCheckedChange={() => handleCheckboxChange(itemId)}
-                  className="border-2"
+                  className="border-2 justify-between"
                 />
+                
+                    
                 {isEditing ? (
                   <div className="flex-grow flex items-center space-x-2">
                     <Textarea
@@ -240,35 +314,98 @@ export function RubricGrading() {
                   <>
                     <Label 
                       htmlFor={itemId}
-                      className="flex-grow text-sm cursor-pointer"
+                      className="flex-grow text-xs cursor-pointer"
                     >
                       {item.description}
                     </Label>
-                    <span className={cn(
-                      "font-semibold text-sm",
-                      isPositive ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"
-                    )}>
-                      {item.points > 0 ? '+' : ''}{item.points}
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleEditStart(item)}
-                      className="hover:bg-slate-700 hover:text-accent-foreground"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setFeedbackItemId(itemId)}
-                      className="hover:bg-slate-700 hover:text-accent-foreground"
-                    >
-                      <MessageSquare className="h-4 w-4" />
-                    </Button>
+
+                    
+
+                      <div className="flex-col">
+                        { allowRubricEdit &&
+                          <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleEditStart(item)}
+                          className="hover:bg-slate-700 hover:text-accent-foreground"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>}
+
+                        { allowAiFeedback &&
+                          <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setFeedbackItemId(itemId)}
+                          className="hover:bg-slate-700 hover:text-accent-foreground"
+                        >
+                          <MessageSquare className="h-4 w-4" />
+                        </Button>}
+
+                        
+                      </div>
+                    
+                    
                   </>
                 )}
               </motion.div>
+              <AnimatePresence>
+                {feedbackItemId === item._id.toString() && (
+                  <motion.div
+                    layout
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-4 p-4 bg-muted rounded-md mt-2"
+                  >
+                    <RadioGroup
+                      value={aiShouldApply || undefined}
+                      onValueChange={(value) => setAiShouldApply(value as 'should' | 'should-not')}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="should" id="ai-feedback-should" />
+                        <Label htmlFor="ai-feedback-should">
+                          {isChecked
+                            ? 'AI should not have selected this item but did'
+                            : 'AI should have selected this item but did not'}
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                    <Textarea
+                      value={aiFeedback}
+                      onChange={(e) => setAIFeedback(e.target.value)}
+                      placeholder="Explain why the AI made the wrong decision"
+                      rows={3}
+                      className="w-full resize-none"
+                    />
+                    <div className="flex justify-end space-x-2">
+                      <Button variant="outline" onClick={() => {
+                        setFeedbackItemId(null);
+                        setAIFeedback('');
+                        setAiShouldApply(null);
+                      }}>
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          if (aiShouldApply && !!aiFeedback) {
+                            handleAIFeedbackChange(item._id.toString());
+                          } else {
+                            toast({
+                              title: "Error",
+                              description: "Please select whether the AI should have applied this item.",
+                              variant: "destructive",
+                            });
+                          }
+                        }}
+                        disabled={!aiShouldApply || !aiFeedback}
+                      >
+                        Update Rubric
+                      </Button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           );
         })}
@@ -283,7 +420,7 @@ export function RubricGrading() {
           onChange={(e) => handleFeedbackChange(e.target.value)}
           placeholder="Provide feedback to the student..."
           rows={6}
-          className="w-full resize-none border-2 focus:ring-2 focus:ring-primary"
+          className="w-full height-auto border-2 focus:ring-2 focus:ring-primary"
         />
       </div>
     </div>
