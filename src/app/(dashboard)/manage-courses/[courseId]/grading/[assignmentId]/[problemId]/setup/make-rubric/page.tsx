@@ -9,6 +9,8 @@ import { Loader2 } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { RubricSection } from '@/components/various/RubricSection'
 import { useGetAssignmentById, useUpdateAssignment, useUpsertProblem, useUpsertRubricItem} from '@/hooks/queries/useAssignments'
+import { analyzeApi } from '@/api-client/endpoints/analyze'
+import { useInvalidateRubric } from '@/hooks/queries/queryKeyInvalidation'
 
 interface LLMAnalysisResult {
   commonCorrectThings: string[];
@@ -38,6 +40,7 @@ export default function MakeRubricPage({
 
   const { mutate: upsertProblem } = useUpsertProblem()
   const { mutate: upsertRubricItem, isPending: upsertingRubricItem } = useUpsertRubricItem()
+  const invalidateRubric = useInvalidateRubric()
 
   // Derived state
   const problem = assignment?.problems.find(p => p._id?.toString() === params.problemId)
@@ -107,12 +110,43 @@ export default function MakeRubricPage({
   }
   
   const handleGenerateRubric = async () => {
-    if (!problem || !llmAnalysis || !assignment) return
+    if (!problem || !assignment) return
     
-    setGeneratingRubric(false)
+    setGeneratingRubric(true)
     
+    try {
+      // Optional additional context for rubric generation
+      const additionalContext = "Ensure rubric considers creativity and precision.";
+  
+      // Call the generateRubric API
+      const { data, error } = await analyzeApi.generateRubric(params.assignmentId, params.problemId, additionalContext);
+  
+      if (error) {
+        console.error("Error generating rubric:", error.error);
+        throw new Error(error.details || "Something went wrong generating the rubric")
+      }
 
-  }
+      toast({
+        title: "Rubric successfully generated!",
+        description: "Nice! Your rubric was succesffully generated. Make changes as you see fit!"
+      })
+
+      return;
+    } catch (error) {
+      console.error("Unexpected error during rubric generation:", error);
+      toast({
+        title: "Uh oh! Something went wrong generating your rubric!",
+        description: "Please try again later"
+      })
+    } finally {
+      setGeneratingRubric(false); // Hide loading indicator after process
+      invalidateRubric(params)
+    }
+  };
+
+ 
+  
+  
 
   // Loading states
   if (assignmentLoading) {
@@ -204,7 +238,7 @@ export default function MakeRubricPage({
         <CardHeader>
           <CardTitle className="flex justify-between items-center">
             <span>Rubric</span>
-            <Button onClick={handleGenerateRubric} disabled={generatingRubric || !llmAnalysis}>
+            <Button onClick={handleGenerateRubric} disabled={generatingRubric}>
               {generatingRubric ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
