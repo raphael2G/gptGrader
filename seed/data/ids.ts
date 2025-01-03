@@ -52,6 +52,8 @@ export const ids = {
   },
   users: {
     'darmfiels-id': new mongoose.Types.ObjectId(),
+    'asils-id': new mongoose.Types.ObjectId(),
+    'akeils-id': new mongoose.Types.ObjectId(),
     ...Array.from({ length: 20 }, (_, i) => ({
       [`student-${i + 1}`]: new mongoose.Types.ObjectId(),
     })).reduce((acc, cur) => ({ ...acc, ...cur }), {}),

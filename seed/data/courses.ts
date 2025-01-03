@@ -1,4 +1,5 @@
 import { ids } from './ids';
+import { realPeopleIds } from './users';
 
 export const courses = [
   {
@@ -7,7 +8,7 @@ export const courses = [
     courseCode: 'CS101',
     description: 'A foundational course on algorithms and data structures.',
     instructor: 'Derek Armfield',
-    instructors: [ids.users['darmfiels-id']], // Reference instructor by ID
+    instructors: [...realPeopleIds], 
     students: Object.values(ids.users), // All students
     assignments: [
       ids.assignments['introduction-to-algorithms']['divide-and-conquer-algorithms'].id,
@@ -22,7 +23,7 @@ export const courses = [
     courseCode: 'CS102',
     description: 'An introduction to mathematical reasoning and discrete structures.',
     instructor: 'Derek Armfield',
-    instructors: [ids.users['darmfiels-id']], // Reference instructor by ID
+    instructors: [...realPeopleIds], 
     students: Object.values(ids.users), // All students
     assignments: [
       ids.assignments['discrete-mathematics']['propositional-logic'].id,
