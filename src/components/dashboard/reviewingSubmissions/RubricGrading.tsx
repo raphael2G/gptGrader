@@ -262,18 +262,21 @@ export function RubricGrading({currentSubmission, allowAiFeedback=false, allowRu
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
-                <span className={cn(
-                      "font-semibold text-xs p-0 m-0",
-                      isPositive ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"
-                    )}>
-                      {item.points > 0 ? '+' : ''}{item.points.toFixed(1)}
-                    </span>
-                <Checkbox
-                  id={itemId}
-                  checked={isChecked}
-                  onCheckedChange={() => handleCheckboxChange(itemId)}
-                  className="border-2 justify-between"
-                />
+
+                <div className="flex flex-col items-center gap-1 p-1">
+                  <span className={cn(
+                        "font-semibold text-xs p-0 m-0",
+                        isPositive ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"
+                      )}>
+                        {item.points > 0 ? '+' : ''}{item.points.toFixed(1)}
+                      </span>
+                  <Checkbox
+                    id={itemId}
+                    checked={isChecked}
+                    onCheckedChange={() => handleCheckboxChange(itemId)}
+                    className="border-2 justify-between"
+                  />
+                </div>
                 
                     
                 {isEditing ? (
