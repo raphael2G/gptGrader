@@ -17,20 +17,17 @@ export async function PATCH(
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-
     const resolution = {
       shouldItemBeApplied,
       explanation,
       resolvedBy: new Types.ObjectId(resolvedBy)
     };
 
-
     const report = await resolveDiscrepancyReportItem(
       new Types.ObjectId(submissionId),
       new Types.ObjectId(rubricItemId),
       resolution
     );
-
 
     return NextResponse.json(report);
   } catch (error) {
