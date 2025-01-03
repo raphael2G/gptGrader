@@ -8,7 +8,7 @@ import { IBulkGradingProgress } from '@/analysis/interfaces/grading';
  * Grades all ungraded submissions for a specific assignment problem
  * @param assignmentId - The assignment ID
  * @param problemId - The specific problem ID within the assignment
- * @param concurrency - Maximum number of parallel grading operations (default: 3)
+ * @param concurrency - Maximum number of parallel grading operations (default: 1)
  * @param progressCallback - Optional callback to report progress
  */
 export async function gradeAllSubmissions(
@@ -22,15 +22,11 @@ export async function gradeAllSubmissions(
 
 
     // Get all ungraded submissions for this assignment/problem
-    console.log("assignmentId:", assignmentId)
-    console.log("problemId:", problemId)
     const assignmentSubmissions = await getSubmissionsByAssignment(assignmentId);
     const problemSubmissions = assignmentSubmissions.filter(p => p.problemId.toString() === problemId.toString())
     const ungradedSubmissions = problemSubmissions.filter(sub => !sub.graded);
 
-    console.log("here are all the ungraded submissions:", ungradedSubmissions.length)
-    console.log("here are all the problem submissions:", problemSubmissions.length)
-    console.log("here are all the assignment submissions:", assignmentSubmissions.length)
+
 
     // throw new Error(`${ungradedSubmissions.length}`)
 
