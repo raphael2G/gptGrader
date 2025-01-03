@@ -19,6 +19,10 @@ import { useUpsertProblem } from '@/hooks/queries/useAssignments'
 import { ISubmission } from '@/models/Submission'
 import { Types } from 'mongoose'
 import { UserAuth } from '@/contexts/AuthContext'
+import { analyzeApi } from '@/api-client/endpoints/analyze'
+import { useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@/hooks/queries/queryKeys'
+import { useInvalidateSubmissions } from '@/hooks/queries/queryKeyInvalidation'
 
 interface AIGradingResult {
   appliedRubricItemIds: string[];
@@ -42,6 +46,7 @@ export default function CalibrateRubricPage({
   const { user } = UserAuth();
   const { toast } = useToast()
   const n = parseInt(searchParams.n as string) || 1
+  const queryClient = useQueryClient();
 
   // React Query Hooks
   const { 
@@ -58,6 +63,7 @@ export default function CalibrateRubricPage({
 
   const { mutate: updateProblem } = useUpsertProblem()
   const { mutate: updateGrading, isPending: isGrading } = useUpdateSubmissionGrading();
+  const invalidateSubmissions = useInvalidateSubmissions()
 
   // Find current problem
   const problem = assignment?.problems.find(p => p._id?.toString() === params.problemId)
@@ -97,43 +103,38 @@ export default function CalibrateRubricPage({
     return <div>No submissions found.</div>
   }
 
-  const handleAIGrading = () => {
+  const handleAIGrading = async () => {
     if (!currentSubmission) return;
-  
-    setIsAiGrading(true);
-    
-    // Your AI selection logic here
-    const selectedItems = problem.rubric.items
-      .map(item => item._id?.toString())
-      .filter(Boolean) as string[];
-    
-    updateGrading(
-      {
-        submissionId: currentSubmission._id.toString(),
-        gradingData: {
-          gradedBy: user?._id?.toString() || '',
-          appliedRubricItems: selectedItems,
-          feedback: "AI Generated Feedback..."
-        }
-      },
-      {
-        onSuccess: () => {
-          setIsAiGrading(false);
-          toast({
-            title: "Success",
-            description: "AI calibration complete"
-          });
-        },
-        onError: (error) => {
-          setIsAiGrading(false);
-          toast({
-            title: "Error",
-            description: error.message || "Failed to calibrate with AI",
-            variant: "destructive"
-          });
-        }
+      
+    try {
+      setIsAiGrading(true);
+
+      // Get AI grading results
+      const response = await analyzeApi.gradeSubmission(currentSubmission._id.toString());
+      
+      if (!response.data) {
+        throw new Error("No data received from AI grading");
       }
-    );
+
+      toast({
+        title: "Success",
+        description: "Submission graded by AI successfully"
+      });
+  
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to calibrate with AI",
+        variant: "destructive"
+      });
+    } finally {
+      invalidateSubmissions({
+        assignmentId: params.assignmentId, 
+        problemId: params.problemId, 
+        submissionId: currentSubmission._id.toString()
+      })
+      setIsAiGrading(false)
+    }
   };
 
 
@@ -182,7 +183,7 @@ export default function CalibrateRubricPage({
           </p>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[65fr,35fr] gap-8">
+        <div className="grid grid-cols-1 xl:grid-cols-[55fr,45fr] gap-8">
           {/* Left Column - Question and Response */}
           <div className="space-y-8">
             <Card className="overflow-hidden">
@@ -223,7 +224,7 @@ export default function CalibrateRubricPage({
                   </Button>
                 </div>
 
-                <RubricGrading/>
+                <RubricGrading currentSubmission={currentSubmission} allowRubricEdit={true} allowAiFeedback={true}/>
               </CardContent>
             </Card>
           </div>
