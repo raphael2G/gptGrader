@@ -22,6 +22,8 @@ import {
   useGetAssignmentById,
   useUpdateAssignment
 } from '@/hooks/queries/useAssignments'
+import { Switch } from '@/components/ui/switch'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 // Skeleton loader component for assignment details
 const AssignmentDetailsSkeleton = () => (
@@ -172,12 +174,65 @@ const StatusBadge = ({ isPublished }: { isPublished: boolean }) => {
   )
 }
 
+const StatusSwitch = ({ 
+  isEnabled, 
+  onToggle, 
+  disabled,
+  disabledMessage,
+  offLabel,
+  onLabel
+}: { 
+  isEnabled: boolean; 
+  onToggle: () => void;
+  disabled: boolean;
+  disabledMessage?: string;
+  offLabel: string;
+  onLabel: string;
+}) => {
+
+  const switchElement = (
+    <div className="flex items-center space-x-2 my-2">
+      <Switch
+        checked={isEnabled}
+        onCheckedChange={onToggle}
+        disabled={disabled}
+        aria-label="Toggle assignment publish status"
+      />
+      <Label className="text-sm text-muted-foreground">
+        {isEnabled ? onLabel : offLabel}
+      </Label>
+    </div>
+  )
+
+  if (disabled) {
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="cursor-not-allowed">
+                {switchElement}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{disabledMessage || "Unable to toggle in current state."}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )
+    }
+
+  return switchElement
+}
+  
+
+
 // Main component
 export function AssignmentDetails({ assignmentId }: { assignmentId: string }) {
   const { toast } = useToast()
   const router = useRouter()
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false)
+  const [isPublishedStatusDialogOpen, setIsPublishedStatusDialogOpen] = useState(false)
+  const [isGradesReleasedStatusDialogOpen, setIsGradesReleasedStatusDialogOpen] = useState(false)
   const [validationError, setValidationError] = useState<string | null>(null)
 
   // React Query hooks
@@ -249,10 +304,28 @@ export function AssignmentDetails({ assignmentId }: { assignmentId: string }) {
       },
       {
         onSuccess: () => {
-          setIsStatusDialogOpen(false)
+          setIsPublishedStatusDialogOpen(false)
           toast({
             title: "Success",
             description: `Assignment ${assignment.isPublished ? "unpublished" : "published"} successfully`,
+          })
+        }
+      }
+    )
+  }
+
+  const handleReleaseGradesChange = () => {
+    updateAssignment(
+      {
+        assignmentId,
+        updateData: { areGradesReleased: !assignment.areGradesReleased }
+      },
+      {
+        onSuccess: () => {
+          setIsGradesReleasedStatusDialogOpen(false)
+          toast({
+            title: "Success",
+            description: `Assignment ${assignment.areGradesReleased ? "released" : "hid"} grades successfully`,
           })
         }
       }
@@ -320,7 +393,7 @@ export function AssignmentDetails({ assignmentId }: { assignmentId: string }) {
               </p>
             </div>
           </div>
-          <div>
+          {/* <div>
             <p className="font-semibold">Status:</p>
             <div 
               onClick={() => !isUpdatingAssignment && setIsStatusDialogOpen(true)} 
@@ -328,7 +401,27 @@ export function AssignmentDetails({ assignmentId }: { assignmentId: string }) {
             >
               <StatusBadge isPublished={assignment.isPublished} />
             </div>
+          </div> */}
+          <div className="flex-col justify-between">
+            <StatusSwitch 
+              isEnabled={assignment.isPublished} 
+              onToggle={() => !isUpdatingAssignment && setIsPublishedStatusDialogOpen(true)}
+              disabled={false}
+              offLabel={"Assignment Not Published"}
+              onLabel={"Assignment Published"}
+            />
+            <StatusSwitch 
+              isEnabled={assignment.areGradesReleased} 
+              onToggle={() => !isUpdatingAssignment && setIsGradesReleasedStatusDialogOpen(true)}
+              disabled={!assignment.isPublished}
+              disabledMessage='Must publish assignment before you can publish grades'
+              offLabel={"Grades Not Released"}
+              onLabel={"Grades Released"}
+            />
           </div>
+            
+            
+
           <div>
             <p className="font-semibold">Problems:</p>
             <p className="text-sm text-muted-foreground">{assignment.problems.length}</p>
@@ -336,7 +429,7 @@ export function AssignmentDetails({ assignmentId }: { assignmentId: string }) {
         </div>
       </CardContent>
 
-      <AlertDialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
+      <AlertDialog open={isPublishedStatusDialogOpen} onOpenChange={setIsPublishedStatusDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
@@ -350,6 +443,33 @@ export function AssignmentDetails({ assignmentId }: { assignmentId: string }) {
             <AlertDialogCancel disabled={isUpdatingAssignment}>Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleStatusChange}
+              disabled={isUpdatingAssignment}
+            >
+              {isUpdatingAssignment ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : 'Continue'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isGradesReleasedStatusDialogOpen} onOpenChange={setIsGradesReleasedStatusDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {`${assignment.areGradesReleased ? "Hide grades" : "Release grades"} for this assignment?`}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Students will {assignment.areGradesReleased ? "no longer" : "now"} be able to see the rubric for all problems in this assignment.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isUpdatingAssignment}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleReleaseGradesChange}
               disabled={isUpdatingAssignment}
             >
               {isUpdatingAssignment ? (
