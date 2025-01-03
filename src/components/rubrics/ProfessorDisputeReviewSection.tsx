@@ -20,6 +20,7 @@ import {
   useResolveDiscrepancyReport 
 } from '@/hooks/queries/useDiscrepancyReports';
 import { UserAuth } from '@/contexts/AuthContext';
+import { IDiscrepancyItem } from '@/models/DiscrepancyReport';
 
 interface ProfessorDisputeReviewSectionProps {
   assignmentId: string;
@@ -95,7 +96,7 @@ export const ProfessorDisputeReviewSection: React.FC<ProfessorDisputeReviewSecti
     setComment("");
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (selectedItem: IDiscrepancyItem) => {
     if (!selectedResolution || !comment || !expandedItemId) {
       toast({
         description: "Please complete all fields before submitting.",
@@ -109,9 +110,9 @@ export const ProfessorDisputeReviewSection: React.FC<ProfessorDisputeReviewSecti
         submissionId,
         rubricItemId: expandedItemId,
         resolutionData: {
-          shouldItemBeApplied: selectedResolution === 'student_error',
+          shouldItemBeApplied: selectedResolution === 'student_error' ? selectedItem.wasOriginallyApplied : !selectedItem.wasOriginallyApplied,
           explanation: comment,
-          resolvedBy: user._id.toString() // This should come from auth context
+          resolvedBy: user._id.toString() 
         }
       },
       {
@@ -126,6 +127,7 @@ export const ProfessorDisputeReviewSection: React.FC<ProfessorDisputeReviewSecti
         },
         onError: (error) => {
           toast({
+
             title: "Error",
             description: error.message,
             variant: "destructive",
@@ -281,7 +283,7 @@ export const ProfessorDisputeReviewSection: React.FC<ProfessorDisputeReviewSecti
                       Cancel
                     </Button>
                     <Button 
-                      onClick={handleSubmit}
+                      onClick={() => handleSubmit}
                       disabled={isResolving}
                       isLoading={isResolving}
                     >
