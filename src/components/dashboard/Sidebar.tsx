@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useSidebar } from '@/contexts/SidebarContext'
+import FeedbackDialog from '../various/FeedbackReport'
 
 const SidebarItem = ({ icon: Icon, label, href, isCollapsed }: { icon: any, label: string, href: string, isCollapsed: boolean }) => (
   <Link href={href} className="flex items-center p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-300 ease-in-out">
@@ -35,6 +36,10 @@ export function Sidebar() {
     setMounted(true)
   }, [])
 
+  useEffect(()=>{
+    setTheme("light")
+  }, [theme])
+
   if (!mounted) {
     return null
   }
@@ -54,7 +59,7 @@ export function Sidebar() {
           >
             {isCollapsed ? <ChevronRight /> : <ChevronLeft />}
           </Button>
-          <div className={cn("transition-all duration-300 ease-in-out", 
+          {/* <div className={cn("transition-all duration-300 ease-in-out", 
             isCollapsed ? "w-0 opacity-0" : "w-auto opacity-100"
           )}>
             <DropdownMenu>
@@ -75,7 +80,7 @@ export function Sidebar() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
+          </div> */}
         </div>
         <ul className="space-y-2 font-medium">
           <li>
@@ -87,13 +92,16 @@ export function Sidebar() {
             <SidebarItem icon={Briefcase} label="Manage Courses" href="/manage-courses" isCollapsed={isCollapsed} />
           </li>)}
 
-
           <li>
             <SidebarItem icon={User} label="Account" href="/account" isCollapsed={isCollapsed} />
           </li>
           <li>
             <SidebarItem icon={Settings} label="Settings" href="/settings" isCollapsed={isCollapsed} />
           </li>
+
+          <div className="mt-auto pt-2 border-t border-gray-200 dark:border-gray-700">
+            <FeedbackDialog isCollapsed={isCollapsed} />
+          </div>
         </ul>
       </div>
     </aside>
