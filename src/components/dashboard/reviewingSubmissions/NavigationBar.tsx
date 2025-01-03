@@ -81,7 +81,7 @@ export function NavigationBar({
             </Button>
             {isLastSubmission && mode=="calibration" ? (
               <Button
-                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-bold py-2 px-4 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:-translate-y-1 hover:scale-105 w-32"
+                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-bold py-2 px-4 shadow-lg transition duration-300 ease-in-out transform hover:-translate-y-1 hover:scale-105 w-32"
                 onClick={handleFinalizeRubric}
               >
                 Finish Calibration
