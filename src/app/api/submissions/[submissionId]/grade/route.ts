@@ -9,10 +9,6 @@ export async function PATCH(
 ) {
   try {
     const { gradedBy, appliedRubricItems, feedback } = await request.json();
-    console.log(params.submissionId)
-    console.log(gradedBy)
-    console.log(appliedRubricItems)
-    console.log(feedback)
 
     const submission = await updateSubmissionGrading(
       new Types.ObjectId(params.submissionId),
