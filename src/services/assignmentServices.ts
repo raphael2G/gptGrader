@@ -8,7 +8,8 @@ import {
   deleteProblemQuery,
   upsertRubricItemQuery,
   deleteRubricItemQuery,
-  updateProblemReferenceSolutionQuery
+  updateProblemReferenceSolutionQuery,
+  updateProblemRubricQuery
 } from '@/queries/assignmentQueries';
 import { IAssignment, IProblem, IRubricItem } from '@/models/Assignment';
 
@@ -87,6 +88,20 @@ export async function upsertProblem(
   }
 }
 
+export async function updateProblemRubric(
+  assignmentId: Types.ObjectId,
+  problemId: Types.ObjectId,
+  newRubric: { items: IRubricItem[] }
+): Promise<void> {
+  try{
+    const result = await updateProblemRubricQuery(assignmentId, problemId, newRubric)
+    return result
+  } catch (error) {
+    console.error("Error updating problem rubric:", error);
+    throw new Error(`Failed to update problem rubric.`);
+  }
+}
+
 
 export async function updateProblemReferenceSolution(
   assignmentId: Types.ObjectId,
@@ -118,6 +133,52 @@ export async function deleteProblem(
     return updatedAssignment;
   } catch (error) {
     throw new Error(`Failed to delete problem: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+export async function updateRubricForProblem(
+  assignmentId: Types.ObjectId,
+  problemId: Types.ObjectId,
+  newRubric: {description: string, points: number}[]
+) {
+  try {
+    // Fetch the assignment
+    const assignment = await getAssignmentById(assignmentId);
+    if (!assignment) {
+      throw new Error("Assignment not found");
+    }
+
+    // Find the specific problem in the assignment
+    const problem = assignment.problems.find(
+      (p) => p._id?.toString() === problemId.toString()
+    );
+    if (!problem) {
+      throw new Error("Problem not found in assignment");
+    }
+
+    const rubricBeforeSending = {
+      items: newRubric.map((item) => ({
+        // _id: new Types.ObjectId(), // Generate a new ObjectId
+        description: item.description,
+        points: item.points,
+      } as IRubricItem
+    ))
+  }
+
+
+    // Call upsertProblem to update the problem
+    await updateProblemRubricQuery(assignmentId, problemId, rubricBeforeSending);
+
+
+
+  } catch (error) {
+
+    console.error("Error updating problem rubric:", error);
+    throw new Error(
+      `Failed to update rubric for problem: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
   }
 }
 

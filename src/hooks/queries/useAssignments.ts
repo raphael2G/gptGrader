@@ -389,7 +389,6 @@ export function useDeleteRubricItem() {
       return response.data
     }, 
     onSuccess: (data, variables) => {
-      // invalidate queries
       queryClient.invalidateQueries({
         queryKey: queryKeys.assignmentKeys.item(variables.assignmentId)
       })

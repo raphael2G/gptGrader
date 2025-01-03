@@ -8,9 +8,15 @@ import { IAssignment, IProblem, IRubricItem } from '@/models/Assignment';
 
 
 
-export const getAssignmentByIdQuery = async (assignmentId: Types.ObjectId) => {
+export const getAssignmentByIdQuery = async (assignmentId: Types.ObjectId): Promise<IAssignment> => {
   await dbConnect();
-  return Assignment.findById(assignmentId);
+  const assignment = Assignment.findById(assignmentId);
+
+  if (!assignment){
+    throw new Error("Unable to find the assignment")
+  }
+
+  return assignment
 };
 
 /**
@@ -211,16 +217,7 @@ export const upsertProblemQuery = async (
       );
 
       
-
-
-
       if (existingProblemIndex >= 0) {
-
-        console.log("fonud problem")
-        console.log("fonud problem")
-        console.log("fonud problem")
-        console.log("fonud problem")
-        console.log("goofy")
 
         // Preserve existing _id and merge with new data
         assignment.problems[existingProblemIndex] = {
@@ -255,6 +252,38 @@ export const upsertProblemQuery = async (
     session.endSession();
   }
 };
+
+export const updateProblemRubricQuery = async (
+  assignmentId: Types.ObjectId,
+  problemId: Types.ObjectId,
+  newRubric: { items: IRubricItem[] }
+) => {
+  await dbConnect();
+
+  const assignment = await Assignment.findById(assignmentId);
+
+  if (!assignment) {
+    throw new Error("Assignment not found");
+  }
+
+  // Find the specific problem by ID
+  const problem = assignment.problems.find(
+    (p: { _id: Types.ObjectId }) => p._id.toString() === problemId.toString()
+  );
+
+  if (!problem) {
+    throw new Error("Problem not found in the assignment");
+  }
+
+  // Update only the rubric
+  problem.rubric = newRubric;
+
+  // Save the assignment
+  await assignment.save();
+
+  return assignment;
+};
+
 
 export const updateProblemReferenceSolutionQuery = async (
   assignmentId: Types.ObjectId,

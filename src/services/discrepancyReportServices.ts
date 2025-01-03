@@ -73,10 +73,6 @@ export async function resolveDiscrepancyReportItem(
   }
 ) {
   try {
-    console.log("made it to here - services")
-    console.log("made it to here - services")
-    console.log("made it to here - services")
-    console.log("made it to here - services")
     const report = await resolveDiscrepancyItemQuery(submissionId, rubricItemId, resolution);
     return report;
   } catch (error) {
